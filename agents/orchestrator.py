@@ -14,7 +14,7 @@ def create_deployment_crew(
     repo_full_name: str,
     instance_id: str,
     strategy: str = "rolling",
-    llm: str = "claude-3-5-sonnet-20241022",
+    llm: str = "llama-3.1-70b-versatile",
 ) -> Crew:
     """Create a deployment crew that orchestrates the full pipeline.
 

@@ -32,7 +32,7 @@ def check_deployment_status(deployment_id: str) -> str:
     raise NotImplementedError("Will be implemented on Day 4")
 
 
-def create_deploy_agent(llm: str = "claude-3-5-sonnet-20241022") -> Agent:
+def create_deploy_agent(llm: str = "llama-3.1-70b-versatile") -> Agent:
     """Create the Deploy Agent with its tools.
 
     The Deploy Agent is responsible for:

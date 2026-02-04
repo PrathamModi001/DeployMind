@@ -2,6 +2,8 @@
 
 Multi-agent autonomous deployment system powered by AI.
 
+**100% FREE** - Uses Groq's free tier (1000 requests/day) or local Ollama.
+
 ## Quick Start
 
 ```bash
@@ -15,6 +17,7 @@ pip install -r requirements.txt
 
 # 3. Configure environment
 cp .env.example .env
+# Get free Groq API key: https://console.groq.com/keys
 # Edit .env with your API keys
 
 # 4. Start local services

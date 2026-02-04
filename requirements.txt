@@ -3,7 +3,14 @@
 
 # AI Framework
 crewai>=0.28.0
-anthropic>=0.18.0
+
+# LLM Provider - Groq (FREE tier: 1000 req/day)
+groq>=0.4.0
+
+# Alternative LLM options (uncomment to use):
+# ollama-python>=0.1.0  # For local FREE inference (no API needed)
+# openai>=1.0.0  # OpenRouter/OpenAI compatible
+# anthropic>=0.18.0  # If you have Claude API access
 
 # Web Framework (for future API)
 fastapi>=0.109.0
@@ -48,3 +55,5 @@ python-json-logger>=2.0.0
 # Utilities
 pydantic>=2.5.0
 httpx>=0.26.0
+
+dotenv

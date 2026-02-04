@@ -26,7 +26,7 @@ def check_secrets(repo_path: str) -> str:
     raise NotImplementedError("Will be implemented on Day 2")
 
 
-def create_security_agent(llm: str = "claude-3-5-sonnet-20241022") -> Agent:
+def create_security_agent(llm: str = "llama-3.1-70b-versatile") -> Agent:
     """Create the Security Agent with its tools.
 
     The Security Agent is responsible for:

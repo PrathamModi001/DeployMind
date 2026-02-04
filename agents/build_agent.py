@@ -32,7 +32,7 @@ def optimize_docker_image(dockerfile_content: str) -> str:
     raise NotImplementedError("Will be implemented on Day 3")
 
 
-def create_build_agent(llm: str = "claude-3-5-sonnet-20241022") -> Agent:
+def create_build_agent(llm: str = "llama-3.1-70b-versatile") -> Agent:
     """Create the Build Agent with its tools.
 
     The Build Agent is responsible for:
