@@ -3,6 +3,7 @@
 
 # AI Framework
 crewai>=0.28.0
+crewai-tools>=0.2.0
 
 # LLM Provider - Groq (FREE tier: 1000 req/day)
 groq>=0.4.0
@@ -55,5 +56,3 @@ python-json-logger>=2.0.0
 # Utilities
 pydantic>=2.5.0
 httpx>=0.26.0
-
-dotenv

@@ -57,6 +57,24 @@ Documentation for DeployMind's Clean Architecture implementation.
 
 ---
 
+### **[Security Design](security-design.md)** (Critical)
+**What**: Comprehensive security architecture and best practices
+**Topics**:
+- 10 security layers (authentication, validation, secrets, container security, etc.)
+- Input validation and sanitization
+- Secret management and redaction
+- Container security best practices
+- Network security and AWS security groups
+- Database security (SQL injection prevention)
+- Deployment safety (rollback mechanisms)
+- Monitoring and incident response
+- Security roadmap (MVP to production)
+- Known risks and mitigations
+
+**Read this if**: You want to understand how security is implemented throughout the system
+
+---
+
 ## 🎯 Quick Reference
 
 ### **System Layers**

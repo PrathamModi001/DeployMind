@@ -34,6 +34,10 @@ coverage.xml
 
 # Docker
 docker-compose.override.yml
+Dockerfile.optimized
+.dockerignore.optimized
+Dockerfile.test
+Dockerfile.tmp
 
 # OS
 .DS_Store

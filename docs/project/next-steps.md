@@ -1,22 +1,27 @@
 # DeployMind - Next Steps Roadmap
 
-**Current Status**: Day 1 Setup Complete ✅
-**Next Phase**: Day 1 Core Implementation
+**Current Status**: Day 2 Complete ✅
+**Next Phase**: Day 3 - Build Agent Implementation
 
 ---
 
 ## ✅ What's Done
 
-- ✅ Project structure created
-- ✅ Virtual environment + dependencies installed
-- ✅ Switched to Groq API (saved $15!)
-- ✅ All credentials verified:
-  - Groq API: gsk_Gb3V70...A8v6 ✅
-  - GitHub: PrathamModi001 ✅
-  - AWS: IAM user `modi` (ap-south-1) ✅
-- ✅ docker-compose.yml ready (PostgreSQL + Redis)
-- ✅ Agent skeleton files created
-- ✅ Core config.py implemented
+### **Day 1: Setup & Architecture** ✅
+- ✅ Clean Architecture implemented (5 layers)
+- ✅ Database models (6 tables with SQLAlchemy)
+- ✅ Security framework (input validation, secret redaction)
+- ✅ Infrastructure clients (AWS, GitHub, Groq, Redis)
+- ✅ Dependency injection configured
+- ✅ 60+ tests passing (validators + infrastructure)
+
+### **Day 2: Security Agent** ✅
+- ✅ Trivy scanner integration (15/15 tests passing)
+- ✅ Security Agent with CrewAI + Groq LLM (17/17 tests passing)
+- ✅ Rule-based fallback (no AI dependency)
+- ✅ 3 security policies (strict/balanced/permissive)
+- ✅ CVE analysis and risk scoring
+- ✅ Total: 32/32 Day 2 tests passing
 
 ---
 

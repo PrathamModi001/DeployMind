@@ -73,6 +73,34 @@ Orchestrator Agent (Coordinator)
 
 ---
 
+## 🔒 Security
+
+**Security-first approach** with comprehensive protection:
+
+**Input Validation**:
+- 15+ validators prevent SQL injection, command injection, path traversal, XSS
+- All user inputs validated before use
+- Docker tags sanitized to prevent image poisoning
+
+**Secret Management**:
+- Automatic secret redaction in all logs (API keys, passwords, tokens)
+- No secrets in code (environment variables only)
+- Secure logging framework prevents credential leakage
+
+**Audit & Compliance**:
+- Complete audit trail for all operations
+- Security event logging with severity levels
+- OWASP Top 10 compliance (5/10 complete, 5/10 in progress)
+
+**Testing**:
+- 45 security tests (100% passing)
+- Attack prevention verified (injection, traversal, XSS)
+- Comprehensive test coverage
+
+**Read more**: [docs/architecture/security-design.md](docs/architecture/security-design.md)
+
+---
+
 ## 💾 Database
 
 **6 PostgreSQL tables** track deployments:
@@ -141,9 +169,11 @@ pytest -m "aws or github"
 - ✅ Database models created
 - ✅ Infrastructure clients ready (AWS, GitHub, Groq, Redis)
 - ✅ Dependency injection configured
+- ✅ Security framework (60+ tests passing)
 
 **Phase 2: Implementation** ⏳ **IN PROGRESS**
-- Next: Security Agent (Day 2)
+- ✅ Day 2: Security Agent (32/32 tests passing)
+- Next: Day 3 - Build Agent
 
 **See**: [docs/project/next-steps.md](docs/project/next-steps.md)
 
