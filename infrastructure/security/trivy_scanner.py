@@ -57,46 +57,53 @@ class TrivyScanResult:
 
 class TrivyScanner:
     """
-    Trivy vulnerability scanner.
+    Trivy vulnerability scanner using Docker.
 
     Scans Docker images and filesystems for known vulnerabilities.
     Returns structured results with CVE information.
+
+    Uses Docker-based Trivy (no binary download required).
     """
 
-    def __init__(self, trivy_path: str = "trivy"):
-        """
-        Initialize Trivy scanner.
+    def __init__(self):
+        """Initialize Trivy scanner with Docker."""
+        self._verify_docker_available()
+        logger.info("Trivy scanner initialized (Docker-based)")
 
-        Args:
-            trivy_path: Path to Trivy binary (default: "trivy" in PATH)
-        """
-        self.trivy_path = trivy_path
-        self._verify_trivy_installed()
-
-    def _verify_trivy_installed(self) -> bool:
-        """Verify Trivy is installed and accessible."""
+    def _verify_docker_available(self) -> bool:
+        """Verify Docker is installed and running."""
         try:
             result = subprocess.run(
-                [self.trivy_path, "--version"],
+                ["docker", "--version"],
                 capture_output=True,
                 text=True,
                 timeout=10
             )
-            if result.returncode == 0:
-                version = result.stdout.strip()
-                logger.info("Trivy found", version=version)
-                return True
-            else:
-                logger.warning("Trivy not found in PATH")
-                return False
+            if result.returncode != 0:
+                raise RuntimeError("Docker not found in PATH")
+
+            # Check if Docker daemon is running
+            result = subprocess.run(
+                ["docker", "info"],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if result.returncode != 0:
+                raise RuntimeError("Docker daemon is not running")
+
+            version = result.stdout.split('\n')[0] if result.stdout else "unknown"
+            logger.info("Docker found and running", version=version)
+            return True
+
         except FileNotFoundError:
-            logger.error("Trivy not installed")
+            logger.error("Docker not installed")
             raise RuntimeError(
-                "Trivy not found. Install: https://aquasecurity.github.io/trivy/"
+                "Docker not found. Install: https://docs.docker.com/get-docker/"
             )
         except Exception as e:
-            logger.error("Failed to verify Trivy", error=str(e))
-            return False
+            logger.error("Failed to verify Docker", error=str(e))
+            raise
 
     def scan_image(
         self,
@@ -121,9 +128,11 @@ class TrivyScanner:
         logger.info("Scanning Docker image", image=image_name, severity=severity)
 
         try:
-            # Run Trivy scan with JSON output
+            # Run Trivy in Docker container
             cmd = [
-                self.trivy_path,
+                "docker", "run", "--rm",
+                "-v", "/var/run/docker.sock:/var/run/docker.sock",
+                "aquasec/trivy:latest",
                 "image",
                 "--format", "json",
                 "--severity", severity,
@@ -188,13 +197,20 @@ class TrivyScanner:
         logger.info("Scanning filesystem", path=path, severity=severity)
 
         try:
+            # Convert to absolute path (Docker requires it)
+            import os
+            abs_path = os.path.abspath(path)
+
+            # Run Trivy in Docker container with mounted directory
             cmd = [
-                self.trivy_path,
+                "docker", "run", "--rm",
+                "-v", f"{abs_path}:/target",
+                "aquasec/trivy:latest",
                 "fs",
                 "--format", "json",
                 "--severity", severity,
                 "--no-progress",
-                path
+                "/target"
             ]
 
             result = subprocess.run(
