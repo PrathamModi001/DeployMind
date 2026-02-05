@@ -4,7 +4,9 @@ Multi-agent autonomous deployment system powered by AI.
 
 **100% FREE** - Uses Groq's free tier (1000 requests/day) or local Ollama.
 
-## Quick Start
+---
+
+## 🚀 Quick Start
 
 ```bash
 # 1. Create virtual environment
@@ -23,23 +25,184 @@ cp .env.example .env
 # 4. Start local services
 docker-compose up -d
 
-# 5. Run CLI
-python -m cli.main --help
+# 5. Initialize database
+python -c "from infrastructure.database.connection import init_db; init_db()"
+
+# 6. Verify setup
+python scripts/verify_architecture.py
 ```
 
-## Architecture
+---
+
+## 🏗️ Architecture
+
+DeployMind follows **Clean Architecture** (layered pattern):
+
+```
+deploymind/
+├── domain/              # Business logic (pure Python)
+├── application/         # Use cases & workflows
+├── infrastructure/      # AWS, GitHub, Groq, Redis, Database
+├── agents/              # AI agents (Security, Build, Deploy)
+├── presentation/        # CLI & API interfaces
+├── config/              # Configuration & DI
+└── shared/              # Utilities
+```
+
+**Key Principles**:
+- Dependencies point inward only
+- Domain has no external dependencies
+- Infrastructure implements domain interfaces
+
+**Read more**: [docs/architecture/clean-architecture.md](docs/architecture/clean-architecture.md)
+
+---
+
+## 🤖 Multi-Agent System
+
+Four specialized AI agents powered by Groq LLM:
 
 ```
 Orchestrator Agent (Coordinator)
-    +-- Security Agent  (Trivy scanning, CVE checks)
-    +-- Build Agent     (Dockerfile generation, Docker builds)
-    +-- Deploy Agent    (Rolling deployment, health checks, rollback)
+    ├── Security Agent  (Trivy scanning, CVE analysis)
+    ├── Build Agent     (Dockerfile generation, optimization)
+    └── Deploy Agent    (Rolling deployment, health checks, rollback)
 ```
 
-## Testing
+**Workflow**: GitHub Repository → Security Scan → Build Docker Image → Deploy to AWS EC2 → Health Checks → (Rollback if needed)
+
+---
+
+## 💾 Database
+
+**6 PostgreSQL tables** track deployments:
+
+| Table | Purpose |
+|-------|---------|
+| `deployments` | Main deployment tracking |
+| `security_scans` | Trivy results + AI analysis |
+| `build_results` | Docker build information |
+| `health_checks` | Application monitoring |
+| `deployment_logs` | Chronological audit trail |
+| `agent_executions` | AI agent performance |
+
+**Read more**: [docs/architecture/database-models.md](docs/architecture/database-models.md)
+
+---
+
+## 🧪 Testing
 
 ```bash
-pytest tests/ -v              # All tests
-pytest -m unit                # Unit tests only
-pytest -m "aws or github"    # Integration tests only
+# Run all tests
+pytest tests/ -v
+
+# Run unit tests only
+pytest tests/unit/ -v
+
+# Run with coverage
+pytest tests/ --cov=deploymind --cov-report=html
+
+# Integration tests
+pytest -m "aws or github"
 ```
+
+---
+
+## 📚 Documentation
+
+**Essential Reading**:
+- **[Getting Started](docs/project/next-steps.md)** - What to implement next
+- **[Architecture Guide](docs/architecture/clean-architecture.md)** - System design
+- **[Database Models](docs/architecture/database-models.md)** - Data schema
+- **[2-Week Plan](docs/project/2-week-plan.md)** - Complete MVP timeline
+
+**All Documentation**: [docs/README.md](docs/README.md)
+
+---
+
+## 💰 Cost
+
+**Total Cost: $0** (Everything is FREE)
+
+| Component | Tool | Cost |
+|-----------|------|------|
+| **LLM** | Groq | $0 (1000 req/day) |
+| **Cloud** | AWS Free Tier | $0 (12 months) |
+| **Database** | PostgreSQL (Docker) | $0 |
+| **Cache** | Redis (Docker) | $0 |
+| **VCS** | GitHub API | $0 |
+
+---
+
+## 🎯 Current Status
+
+**Phase 1: Setup** ✅ **COMPLETE**
+- ✅ Clean Architecture implemented
+- ✅ Database models created
+- ✅ Infrastructure clients ready (AWS, GitHub, Groq, Redis)
+- ✅ Dependency injection configured
+
+**Phase 2: Implementation** ⏳ **IN PROGRESS**
+- Next: Security Agent (Day 2)
+
+**See**: [docs/project/next-steps.md](docs/project/next-steps.md)
+
+---
+
+## 🔧 Development Commands
+
+```bash
+# Verify all credentials
+python scripts/verify_all_credentials.py
+
+# Verify architecture
+python scripts/verify_architecture.py
+
+# Initialize database
+python -c "from infrastructure.database.connection import init_db; init_db()"
+
+# Start services
+docker-compose up -d
+
+# Stop services
+docker-compose down
+```
+
+---
+
+## 📖 Project Structure
+
+```
+deploymind/
+├── agents/                 # AI agents (CrewAI)
+├── application/            # Use cases & interfaces
+├── config/                 # Settings & dependency injection
+├── domain/                 # Business entities & rules
+├── infrastructure/         # External services
+│   ├── cloud/aws/         # AWS EC2 client
+│   ├── vcs/github/        # GitHub client
+│   ├── cache/             # Redis client
+│   ├── llm/groq/          # Groq LLM client
+│   └── database/          # PostgreSQL models
+├── presentation/           # CLI & API
+├── shared/                 # Utilities & exceptions
+├── tests/                  # Organized tests
+├── scripts/                # Utility scripts
+└── docs/                   # Documentation
+```
+
+---
+
+## 🤝 Contributing
+
+See [docs/project/2-week-plan.md](docs/project/2-week-plan.md) for the implementation roadmap.
+
+---
+
+## 📄 License
+
+MIT License - See LICENSE file
+
+---
+
+**Built with**: Python 3.11+ • CrewAI • Groq • AWS • PostgreSQL • Redis
