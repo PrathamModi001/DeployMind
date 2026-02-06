@@ -225,3 +225,266 @@ class EC2Client:
         except ClientError as e:
             logger.error(f"Failed to check SSM agent status: {e}")
             return False
+
+    # Deployment-specific operations (Day 4)
+
+    def deploy_container(
+        self,
+        instance_id: str,
+        image_tag: str,
+        container_name: str = "app",
+        port: int = 8080,
+        env_vars: dict[str, str] | None = None,
+        stop_existing: bool = True
+    ) -> dict:
+        """Deploy Docker container to EC2 instance.
+
+        Performs rolling deployment:
+        1. Pull new Docker image
+        2. Stop existing container (if requested)
+        3. Start new container
+        4. Verify container is running
+
+        Args:
+            instance_id: EC2 instance ID
+            image_tag: Docker image tag (e.g., "myrepo/myapp:v1.0")
+            container_name: Container name (default: "app")
+            port: Port to expose (default: 8080)
+            env_vars: Environment variables dict
+            stop_existing: Stop existing container before starting new (default: True)
+
+        Returns:
+            dict with deployment details (container_id, status, etc.)
+
+        Raises:
+            DeploymentError: If deployment fails
+        """
+        logger.info(
+            f"Deploying container to {instance_id}",
+            extra={
+                "instance_id": instance_id,
+                "image_tag": image_tag,
+                "container_name": container_name,
+                "port": port
+            }
+        )
+
+        try:
+            # Step 1: Pull Docker image
+            pull_result = self.pull_docker_image(instance_id, image_tag)
+            if pull_result.get("exit_code") != 0:
+                raise DeploymentError(
+                    f"Failed to pull image {image_tag}: {pull_result.get('stderr')}"
+                )
+
+            # Step 2: Stop existing container (if requested)
+            if stop_existing:
+                self.stop_container(instance_id, container_name, force=True)
+
+            # Step 3: Build docker run command
+            env_flags = []
+            if env_vars:
+                for key, value in env_vars.items():
+                    env_flags.extend(["-e", f"{key}={value}"])
+
+            run_command = [
+                "docker", "run", "-d",
+                "--name", container_name,
+                "-p", f"{port}:{port}",
+                *env_flags,
+                "--restart", "unless-stopped",
+                image_tag
+            ]
+
+            # Step 4: Start new container
+            start_result = self.run_command(
+                instance_id=instance_id,
+                commands=[" ".join(run_command)],
+                timeout_seconds=120
+            )
+
+            if start_result.get("exit_code") != 0:
+                raise DeploymentError(
+                    f"Failed to start container: {start_result.get('stderr')}"
+                )
+
+            container_id = start_result.get("stdout", "").strip()
+
+            # Step 5: Verify container is running
+            status_result = self.get_container_status(instance_id, container_name)
+
+            logger.info(
+                f"Container deployed successfully",
+                extra={
+                    "instance_id": instance_id,
+                    "container_id": container_id,
+                    "container_name": container_name,
+                    "status": status_result.get("status")
+                }
+            )
+
+            return {
+                "container_id": container_id,
+                "container_name": container_name,
+                "image_tag": image_tag,
+                "port": port,
+                "status": status_result.get("status"),
+                "running": status_result.get("running", False)
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Container deployment failed",
+                extra={"instance_id": instance_id, "error": str(e)}
+            )
+            raise DeploymentError(f"Failed to deploy container: {str(e)}") from e
+
+    def pull_docker_image(self, instance_id: str, image_tag: str) -> dict:
+        """Pull Docker image on EC2 instance.
+
+        Args:
+            instance_id: EC2 instance ID
+            image_tag: Docker image tag to pull
+
+        Returns:
+            Command execution result
+        """
+        logger.info(f"Pulling Docker image", extra={"instance_id": instance_id, "image_tag": image_tag})
+
+        return self.run_command(
+            instance_id=instance_id,
+            commands=[f"docker pull {image_tag}"],
+            timeout_seconds=600  # 10 minutes for large images
+        )
+
+    def stop_container(
+        self,
+        instance_id: str,
+        container_name: str,
+        timeout: int = 30,
+        force: bool = False
+    ) -> dict:
+        """Stop Docker container on EC2 instance.
+
+        Args:
+            instance_id: EC2 instance ID
+            container_name: Name of container to stop
+            timeout: Graceful shutdown timeout (default: 30s)
+            force: Force kill if graceful stop fails (default: False)
+
+        Returns:
+            Command execution result
+        """
+        logger.info(
+            f"Stopping container",
+            extra={
+                "instance_id": instance_id,
+                "container_name": container_name,
+                "force": force
+            }
+        )
+
+        # Try graceful stop first
+        stop_command = f"docker stop -t {timeout} {container_name} 2>/dev/null || true"
+        result = self.run_command(
+            instance_id=instance_id,
+            commands=[stop_command],
+            timeout_seconds=timeout + 10
+        )
+
+        # Remove container
+        rm_command = f"docker rm {container_name} 2>/dev/null || true"
+        self.run_command(
+            instance_id=instance_id,
+            commands=[rm_command],
+            timeout_seconds=30
+        )
+
+        logger.info(f"Container stopped", extra={"container_name": container_name})
+        return result
+
+    def get_container_status(self, instance_id: str, container_name: str) -> dict:
+        """Get Docker container status on EC2 instance.
+
+        Args:
+            instance_id: EC2 instance ID
+            container_name: Name of container to check
+
+        Returns:
+            dict with container status:
+                - running: bool (is container running)
+                - status: str (container status)
+                - container_id: str (container ID if exists)
+                - uptime: str (how long container has been running)
+        """
+        # Check if container exists and get status
+        inspect_command = f"docker inspect --format '{{{{.State.Status}}}}' {container_name} 2>/dev/null || echo 'not_found'"
+        result = self.run_command(
+            instance_id=instance_id,
+            commands=[inspect_command],
+            timeout_seconds=30
+        )
+
+        status = result.get("stdout", "").strip()
+        running = status == "running"
+
+        container_info = {
+            "running": running,
+            "status": status,
+            "container_name": container_name
+        }
+
+        if running:
+            # Get container ID and uptime
+            id_command = f"docker ps -q -f name={container_name}"
+            id_result = self.run_command(
+                instance_id=instance_id,
+                commands=[id_command],
+                timeout_seconds=30
+            )
+            container_info["container_id"] = id_result.get("stdout", "").strip()
+
+            # Get uptime
+            uptime_command = f"docker inspect --format '{{{{.State.StartedAt}}}}' {container_name} 2>/dev/null"
+            uptime_result = self.run_command(
+                instance_id=instance_id,
+                commands=[uptime_command],
+                timeout_seconds=30
+            )
+            container_info["started_at"] = uptime_result.get("stdout", "").strip()
+
+        return container_info
+
+    def list_containers(self, instance_id: str, all_containers: bool = False) -> list[dict]:
+        """List Docker containers on EC2 instance.
+
+        Args:
+            instance_id: EC2 instance ID
+            all_containers: Include stopped containers (default: False)
+
+        Returns:
+            List of container info dicts
+        """
+        flag = "-a" if all_containers else ""
+        command = f"docker ps {flag} --format '{{{{.ID}}}}|{{{{.Names}}}}|{{{{.Status}}}}|{{{{.Image}}}}'"
+
+        result = self.run_command(
+            instance_id=instance_id,
+            commands=[command],
+            timeout_seconds=30
+        )
+
+        containers = []
+        if result.get("exit_code") == 0 and result.get("stdout"):
+            for line in result["stdout"].strip().split("\n"):
+                if line:
+                    parts = line.split("|")
+                    if len(parts) >= 4:
+                        containers.append({
+                            "container_id": parts[0],
+                            "name": parts[1],
+                            "status": parts[2],
+                            "image": parts[3]
+                        })
+
+        return containers

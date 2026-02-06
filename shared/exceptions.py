@@ -24,3 +24,8 @@ class BuildError(DeployMindException):
 class ConfigurationError(DeployMindException):
     """Configuration errors."""
     pass
+
+
+class ValidationError(DeployMindException):
+    """Input validation errors."""
+    pass

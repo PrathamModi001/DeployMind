@@ -7,10 +7,7 @@ Prevents injection attacks, path traversal, and other security vulnerabilities.
 import re
 from typing import Optional
 
-
-class ValidationError(Exception):
-    """Raised when validation fails"""
-    pass
+from shared.exceptions import ValidationError
 
 
 class SecurityValidator:
@@ -134,8 +131,9 @@ class SecurityValidator:
         if not tag:
             return "latest"
 
-        # Remove all non-alphanumeric characters except .-_
-        sanitized = re.sub(r'[^a-zA-Z0-9_.-]', '', str(tag))
+        # Remove all non-alphanumeric characters except .-_:/
+        # Docker tags format: [registry/][namespace/]name[:tag]
+        sanitized = re.sub(r'[^a-zA-Z0-9_.:/-]', '', str(tag))
 
         # Limit length to 128 characters (Docker tag max length)
         if len(sanitized) > 128:
