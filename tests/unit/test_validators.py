@@ -121,9 +121,11 @@ class TestDockerTagSanitization:
 
     def test_docker_tag_sanitization(self):
         """Test that invalid characters are removed"""
-        assert SecurityValidator.sanitize_docker_tag("v1.0; rm -rf /") == "v1.0rm-rf"
+        # Note: / is allowed for registry paths (e.g., docker.io/library/nginx)
+        # and : is allowed for tags
+        assert SecurityValidator.sanitize_docker_tag("v1.0; rm -rf /") == "v1.0rm-rf/"
         assert SecurityValidator.sanitize_docker_tag("v1.0 && curl evil") == "v1.0curlevil"
-        assert SecurityValidator.sanitize_docker_tag("v1.0|cat /etc/passwd") == "v1.0catetcpasswd"
+        assert SecurityValidator.sanitize_docker_tag("v1.0|cat /etc/passwd") == "v1.0cat/etc/passwd"
 
     def test_docker_tag_length_limit(self):
         """Test that tags are truncated to 128 characters"""

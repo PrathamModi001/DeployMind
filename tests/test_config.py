@@ -2,34 +2,34 @@
 
 import pytest
 
-from core.config import Config
+from config.settings import Settings
 
 
 @pytest.mark.unit
 class TestConfig:
     def test_default_values(self):
-        """Config should have sensible defaults."""
-        config = Config()
-        assert config.aws_region == "us-east-1"
-        assert config.environment == "development"
-        assert config.log_level == "INFO"
-        assert config.max_deployment_time_seconds == 300
-        assert config.health_check_interval_seconds == 10
+        """Settings should have sensible defaults."""
+        settings = Settings()
+        assert settings.aws_region == "us-east-1"
+        assert settings.environment == "development"
+        assert settings.log_level == "INFO"
+        assert settings.max_deployment_time_seconds == 300
+        assert settings.health_check_interval_seconds == 10
 
     def test_load_from_env(self, env_vars):
-        """Config.load() should read from environment variables."""
-        config = Config.load()
-        assert config.anthropic_api_key == "sk-ant-test-key"
-        assert config.aws_access_key_id == "AKIATEST"
-        assert config.aws_region == "us-east-1"
-        assert config.github_token == "ghp_test_token"
-        assert config.environment == "testing"
+        """Settings.load() should read from environment variables."""
+        settings = Settings.load()
+        assert settings.groq_api_key == "test-groq-key"
+        assert settings.aws_access_key_id == "AKIATEST"
+        assert settings.aws_region == "us-east-1"
+        assert settings.github_token == "ghp_test_token"
+        assert settings.environment == "testing"
 
     def test_validate_missing_keys(self):
         """validate() should report missing required variables."""
-        config = Config()
-        missing = config.validate()
-        assert "ANTHROPIC_API_KEY" in missing
+        settings = Settings()
+        missing = settings.validate()
+        assert "GROQ_API_KEY" in missing
         assert "AWS_ACCESS_KEY_ID" in missing
         assert "AWS_SECRET_ACCESS_KEY" in missing
         assert "GITHUB_TOKEN" in missing
@@ -41,21 +41,21 @@ class TestConfig:
 
     def test_is_production(self):
         """is_production should reflect environment setting."""
-        config = Config(environment="production")
-        assert config.is_production is True
+        settings = Settings(environment="production")
+        assert settings.is_production is True
 
-        config = Config(environment="development")
-        assert config.is_production is False
+        settings = Settings(environment="development")
+        assert settings.is_production is False
 
     def test_load_from_env_file(self, tmp_path, monkeypatch):
-        """Config.load() should read from a .env file."""
-        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        """Settings.load() should read from a .env file."""
+        monkeypatch.delenv("GROQ_API_KEY", raising=False)
         monkeypatch.delenv("AWS_REGION", raising=False)
         env_file = tmp_path / ".env"
         env_file.write_text(
-            "ANTHROPIC_API_KEY=sk-ant-from-file\n"
+            "GROQ_API_KEY=test-groq-from-file\n"
             "AWS_REGION=eu-west-1\n"
         )
-        config = Config.load(env_file=str(env_file))
-        assert config.anthropic_api_key == "sk-ant-from-file"
-        assert config.aws_region == "eu-west-1"
+        settings = Settings.load(env_file=str(env_file))
+        assert settings.groq_api_key == "test-groq-from-file"
+        assert settings.aws_region == "eu-west-1"

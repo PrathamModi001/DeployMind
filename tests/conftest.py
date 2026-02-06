@@ -16,8 +16,9 @@ def mock_api_keys(monkeypatch):
 @pytest.fixture
 def config():
     """Provide a test configuration with dummy values."""
-    return Config(
-        anthropic_api_key="sk-ant-test-key",
+    from config.settings import Settings
+    return Settings(
+        groq_api_key="test-groq-key",
         aws_access_key_id="AKIATEST",
         aws_secret_access_key="test-secret",
         aws_region="us-east-1",
@@ -33,7 +34,7 @@ def config():
 def env_vars(tmp_path):
     """Set up environment variables for testing, then clean up."""
     test_env = {
-        "ANTHROPIC_API_KEY": "sk-ant-test-key",
+        "GROQ_API_KEY": "test-groq-key",
         "AWS_ACCESS_KEY_ID": "AKIATEST",
         "AWS_SECRET_ACCESS_KEY": "test-secret",
         "AWS_REGION": "us-east-1",

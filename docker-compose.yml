@@ -29,6 +29,16 @@ services:
       timeout: 5s
       retries: 5
 
+  trivy:
+    image: aquasec/trivy:latest
+    container_name: deploymind-trivy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - trivy_cache:/root/.cache/
+    command: ["--version"]
+    restart: "no"
+
 volumes:
   postgres_data:
   redis_data:
+  trivy_cache:

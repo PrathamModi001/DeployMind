@@ -54,37 +54,39 @@ class TestTrivyScanner:
     """Tests for TrivyScanner class."""
 
     @patch('subprocess.run')
-    def test_trivy_installed_check(self, mock_run):
-        """Test that Trivy installation is verified on init."""
-        # Mock successful version check
-        mock_run.return_value = Mock(
-            returncode=0,
-            stdout="Version: 0.48.0"
-        )
+    def test_docker_check_on_init(self, mock_run):
+        """Test that Docker is verified on init (Docker-based Trivy)."""
+        # Mock successful Docker version and info checks
+        mock_run.side_effect = [
+            Mock(returncode=0, stdout="Docker version 24.0.0"),  # docker --version
+            Mock(returncode=0, stdout="Server Version: 24.0.0")  # docker info
+        ]
 
         scanner = TrivyScanner()
-        assert scanner.trivy_path == "trivy"
-        mock_run.assert_called_once()
+        assert scanner is not None
+        assert mock_run.call_count == 2
 
     @patch('subprocess.run')
-    def test_trivy_not_installed_raises_error(self, mock_run):
-        """Test that RuntimeError is raised if Trivy not found."""
+    def test_docker_not_installed_raises_error(self, mock_run):
+        """Test that RuntimeError is raised if Docker not found."""
         mock_run.side_effect = FileNotFoundError()
 
-        with pytest.raises(RuntimeError, match="Trivy not found"):
+        with pytest.raises(RuntimeError, match="Docker not found"):
             TrivyScanner()
 
     @patch('subprocess.run')
     def test_scan_image_success(self, mock_run):
         """Test successful Docker image scan."""
-        # Mock version check
-        version_mock = Mock(returncode=0, stdout="Version: 0.48.0")
-        # Mock scan with vulnerabilities found (returncode 1)
+        # Mock Docker checks (docker --version, docker info)
+        docker_version = Mock(returncode=0, stdout="Docker version 24.0.0")
+        docker_info = Mock(returncode=0, stdout="Server Version: 24.0.0")
+        # Mock Trivy scan with vulnerabilities found
         scan_mock = Mock(
-            returncode=1,  # Trivy returns 1 when vulnerabilities found
-            stdout=json.dumps(SAMPLE_TRIVY_OUTPUT)
+            returncode=0,
+            stdout=json.dumps(SAMPLE_TRIVY_OUTPUT),
+            stderr=""
         )
-        mock_run.side_effect = [version_mock, scan_mock]
+        mock_run.side_effect = [docker_version, docker_info, scan_mock]
 
         scanner = TrivyScanner()
         result = scanner.scan_image("python:3.11-slim")
@@ -99,21 +101,23 @@ class TestTrivyScanner:
         assert result.medium_count == 1
         assert result.low_count == 0
 
-        # Verify scan command
-        scan_call = mock_run.call_args_list[1]
-        assert scan_call[0][0][0] == "trivy"
-        assert scan_call[0][0][1] == "image"
+        # Verify scan command uses docker
+        scan_call = mock_run.call_args_list[2]
+        assert scan_call[0][0][0] == "docker"
+        assert scan_call[0][0][1] == "run"
         assert "python:3.11-slim" in scan_call[0][0]
 
     @patch('subprocess.run')
     def test_scan_image_no_vulnerabilities(self, mock_run):
         """Test scan with no vulnerabilities found."""
-        version_mock = Mock(returncode=0, stdout="Version: 0.48.0")
+        docker_version = Mock(returncode=0, stdout="Docker version 24.0.0")
+        docker_info = Mock(returncode=0, stdout="Server Version: 24.0.0")
         scan_mock = Mock(
             returncode=0,  # No vulnerabilities
-            stdout=json.dumps({"Results": []})
+            stdout=json.dumps({"Results": []}),
+            stderr=""
         )
-        mock_run.side_effect = [version_mock, scan_mock]
+        mock_run.side_effect = [docker_version, docker_info, scan_mock]
 
         scanner = TrivyScanner()
         result = scanner.scan_image("alpine:latest")
@@ -125,12 +129,14 @@ class TestTrivyScanner:
     @patch('subprocess.run')
     def test_scan_filesystem_success(self, mock_run):
         """Test successful filesystem scan."""
-        version_mock = Mock(returncode=0, stdout="Version: 0.48.0")
+        docker_version = Mock(returncode=0, stdout="Docker version 24.0.0")
+        docker_info = Mock(returncode=0, stdout="Server Version: 24.0.0")
         scan_mock = Mock(
-            returncode=1,
-            stdout=json.dumps(SAMPLE_TRIVY_OUTPUT)
+            returncode=0,
+            stdout=json.dumps(SAMPLE_TRIVY_OUTPUT),
+            stderr=""
         )
-        mock_run.side_effect = [version_mock, scan_mock]
+        mock_run.side_effect = [docker_version, docker_info, scan_mock]
 
         scanner = TrivyScanner()
         result = scanner.scan_filesystem("./my-app")
@@ -139,18 +145,21 @@ class TestTrivyScanner:
         assert result.target == "./my-app"
         assert result.total_vulnerabilities == 3
 
-        # Verify scan command
-        scan_call = mock_run.call_args_list[1]
-        assert scan_call[0][0][1] == "fs"
-        assert "./my-app" in scan_call[0][0]
+        # Verify scan command uses docker
+        scan_call = mock_run.call_args_list[2]
+        assert scan_call[0][0][0] == "docker"
+        # Docker will convert relative path to absolute path
+        assert "my-app" in str(scan_call[0][0]) or "/target" in str(scan_call[0][0])
 
     @patch('subprocess.run')
     def test_scan_image_timeout(self, mock_run):
         """Test that timeout is handled correctly."""
-        version_mock = Mock(returncode=0, stdout="Version: 0.48.0")
+        docker_version = Mock(returncode=0, stdout="Docker version 24.0.0")
+        docker_info = Mock(returncode=0, stdout="Server Version: 24.0.0")
         mock_run.side_effect = [
-            version_mock,
-            subprocess.TimeoutExpired("trivy", 300)
+            docker_version,
+            docker_info,
+            subprocess.TimeoutExpired("docker", 300)
         ]
 
         scanner = TrivyScanner()
@@ -160,12 +169,14 @@ class TestTrivyScanner:
     @patch('subprocess.run')
     def test_scan_image_invalid_json(self, mock_run):
         """Test handling of invalid JSON output."""
-        version_mock = Mock(returncode=0, stdout="Version: 0.48.0")
+        docker_version = Mock(returncode=0, stdout="Docker version 24.0.0")
+        docker_info = Mock(returncode=0, stdout="Server Version: 24.0.0")
         scan_mock = Mock(
             returncode=0,
-            stdout="invalid json"
+            stdout="invalid json",
+            stderr=""
         )
-        mock_run.side_effect = [version_mock, scan_mock]
+        mock_run.side_effect = [docker_version, docker_info, scan_mock]
 
         scanner = TrivyScanner()
         with pytest.raises(RuntimeError, match="Invalid Trivy output"):
@@ -174,12 +185,14 @@ class TestTrivyScanner:
     @patch('subprocess.run')
     def test_scan_image_trivy_error(self, mock_run):
         """Test handling of Trivy scan errors."""
-        version_mock = Mock(returncode=0, stdout="Version: 0.48.0")
+        docker_version = Mock(returncode=0, stdout="Docker version 24.0.0")
+        docker_info = Mock(returncode=0, stdout="Server Version: 24.0.0")
         scan_mock = Mock(
-            returncode=2,  # Error code
-            stderr="Trivy error: connection failed"
+            returncode=125,  # Docker error code
+            stderr="Docker error: connection failed",
+            stdout=""
         )
-        mock_run.side_effect = [version_mock, scan_mock]
+        mock_run.side_effect = [docker_version, docker_info, scan_mock]
 
         scanner = TrivyScanner()
         with pytest.raises(RuntimeError, match="Trivy scan failed"):
@@ -188,18 +201,20 @@ class TestTrivyScanner:
     @patch('subprocess.run')
     def test_scan_with_custom_severity(self, mock_run):
         """Test scan with custom severity levels."""
-        version_mock = Mock(returncode=0, stdout="Version: 0.48.0")
+        docker_version = Mock(returncode=0, stdout="Docker version 24.0.0")
+        docker_info = Mock(returncode=0, stdout="Server Version: 24.0.0")
         scan_mock = Mock(
             returncode=0,
-            stdout=json.dumps({"Results": []})
+            stdout=json.dumps({"Results": []}),
+            stderr=""
         )
-        mock_run.side_effect = [version_mock, scan_mock]
+        mock_run.side_effect = [docker_version, docker_info, scan_mock]
 
         scanner = TrivyScanner()
         scanner.scan_image("python:3.11", severity="MEDIUM,LOW")
 
         # Verify severity parameter passed
-        scan_call = mock_run.call_args_list[1]
+        scan_call = mock_run.call_args_list[2]
         assert "--severity" in scan_call[0][0]
         severity_idx = scan_call[0][0].index("--severity") + 1
         assert scan_call[0][0][severity_idx] == "MEDIUM,LOW"
@@ -207,12 +222,14 @@ class TestTrivyScanner:
     @patch('subprocess.run')
     def test_parse_vulnerability_data(self, mock_run):
         """Test that vulnerability data is parsed correctly."""
-        version_mock = Mock(returncode=0, stdout="Version: 0.48.0")
+        docker_version = Mock(returncode=0, stdout="Docker version 24.0.0")
+        docker_info = Mock(returncode=0, stdout="Server Version: 24.0.0")
         scan_mock = Mock(
-            returncode=1,
-            stdout=json.dumps(SAMPLE_TRIVY_OUTPUT)
+            returncode=0,
+            stdout=json.dumps(SAMPLE_TRIVY_OUTPUT),
+            stderr=""
         )
-        mock_run.side_effect = [version_mock, scan_mock]
+        mock_run.side_effect = [docker_version, docker_info, scan_mock]
 
         scanner = TrivyScanner()
         result = scanner.scan_image("python:3.11-slim")
