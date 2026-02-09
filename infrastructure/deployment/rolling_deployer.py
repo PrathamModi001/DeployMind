@@ -90,7 +90,10 @@ class RollingDeployer:
         port: int = 8080,
         health_check_path: str = "/health",
         env_vars: Optional[dict[str, str]] = None,
-        previous_image_tag: Optional[str] = None
+        previous_image_tag: Optional[str] = None,
+        repository: Optional[str] = None,
+        dockerfile_content: Optional[str] = None,
+        build_on_instance: bool = False
     ) -> DeploymentResult:
         """Execute rolling deployment to EC2 instance.
 
@@ -103,6 +106,9 @@ class RollingDeployer:
             health_check_path: Health check endpoint path (default: "/health")
             env_vars: Environment variables for container
             previous_image_tag: Previous image tag (for rollback)
+            repository: GitHub repository to build on instance (if build_on_instance=True)
+            dockerfile_content: Dockerfile content to use (if build_on_instance=True)
+            build_on_instance: Build image on EC2 instance instead of pulling (default: False)
 
         Returns:
             DeploymentResult with deployment outcome
@@ -162,7 +168,10 @@ class RollingDeployer:
                 container_name=container_name,
                 port=port,
                 env_vars=env_vars,
-                stop_existing=True
+                stop_existing=True,
+                repository=repository,
+                dockerfile_content=dockerfile_content,
+                build_on_instance=build_on_instance
             )
 
             result.container_id = deploy_result.get("container_id")

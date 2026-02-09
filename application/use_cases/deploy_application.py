@@ -36,6 +36,9 @@ class DeployRequest:
     health_check_path: str = "/health"
     previous_image_tag: Optional[str] = None
     env_vars: Optional[dict[str, str]] = None
+    repository: Optional[str] = None
+    dockerfile_content: Optional[str] = None
+    build_on_instance: bool = False
 
 
 @dataclass
@@ -51,6 +54,7 @@ class DeployResponse:
     rollback_performed: bool = False
     deployment_duration_seconds: Optional[int] = None
     health_check_passed: bool = False
+    application_url: Optional[str] = None
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 
@@ -126,7 +130,10 @@ class DeployApplicationUseCase:
             port=request.port,
             health_check_path=request.health_check_path,
             env_vars=request.env_vars,
-            previous_image_tag=request.previous_image_tag
+            previous_image_tag=request.previous_image_tag,
+            repository=request.repository,
+            dockerfile_content=request.dockerfile_content,
+            build_on_instance=request.build_on_instance
         )
 
         # Step 3: Build response
@@ -227,6 +234,16 @@ class DeployApplicationUseCase:
         Returns:
             DeployResponse with all details
         """
+        # Construct application URL from instance public IP and port
+        application_url = None
+        if deployment_result.success:
+            try:
+                public_ip = self.ec2_client.get_instance_public_ip(request.instance_id)
+                if public_ip:
+                    application_url = f"http://{public_ip}:{request.port}"
+            except Exception as e:
+                logger.warning(f"Failed to get public IP for application URL: {e}")
+
         return DeployResponse(
             success=deployment_result.success,
             deployment_id=request.deployment_id,
@@ -241,6 +258,7 @@ class DeployApplicationUseCase:
                 if deployment_result.health_check_result
                 else False
             ),
+            application_url=application_url,
             started_at=start_time,
             completed_at=datetime.utcnow()
         )

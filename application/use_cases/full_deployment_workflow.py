@@ -83,7 +83,7 @@ class FullDeploymentWorkflow:
         self.validator = SecurityValidator()
 
         # Infrastructure clients
-        self.github_client = GitHubClient(settings.github_token)
+        self.github_client = GitHubClient(settings)
         self.redis_client = RedisClient(settings.redis_url)
 
         # Use cases
@@ -148,13 +148,13 @@ class FullDeploymentWorkflow:
 
             # Stage 2: Clone repository and get commit SHA
             logger.info("Cloning repository", extra={"repository": request.repository})
-            commit_sha = self._clone_repository(request.repository)
+            commit_sha, clone_path = self._clone_repository(request.repository)
             response.commit_sha = commit_sha
 
             # Stage 3: Security scan (BLOCKING)
             logger.info("Starting security scan phase", extra={"deployment_id": deployment_id})
             security_result = self._execute_security_scan(
-                deployment_id, request.repository, commit_sha
+                deployment_id, request.repository, commit_sha, clone_path
             )
             response.security_passed = security_result["passed"]
             response.security_scan_id = security_result["scan_id"]
@@ -173,7 +173,7 @@ class FullDeploymentWorkflow:
             # Stage 4: Build Docker image
             logger.info("Starting build phase", extra={"deployment_id": deployment_id})
             build_result = self._execute_build(
-                deployment_id, request.repository, commit_sha
+                deployment_id, request.repository, commit_sha, clone_path
             )
             response.build_successful = build_result["success"]
             response.image_tag = build_result["image_tag"]
@@ -191,12 +191,23 @@ class FullDeploymentWorkflow:
 
             # Stage 5: Deploy to EC2
             logger.info("Starting deploy phase", extra={"deployment_id": deployment_id})
+
+            # Read generated Dockerfile for building on instance
+            import os
+            dockerfile_path = os.path.join(clone_path, "Dockerfile")
+            dockerfile_content = None
+            if os.path.exists(dockerfile_path):
+                with open(dockerfile_path, 'r') as f:
+                    dockerfile_content = f.read()
+
             deploy_result = self._execute_deployment(
                 deployment_id,
                 request.instance_id,
                 response.image_tag,
                 request.port,
-                request.health_check_path
+                request.health_check_path,
+                request.repository,
+                dockerfile_content
             )
             response.deployment_successful = deploy_result["success"]
             response.container_id = deploy_result.get("container_id")
@@ -291,40 +302,49 @@ class FullDeploymentWorkflow:
 
         logger.info("Request validation passed")
 
-    def _clone_repository(self, repository: str) -> str:
+    def _clone_repository(self, repository: str) -> tuple[str, str]:
         """Clone GitHub repository and get latest commit SHA.
 
         Args:
             repository: Repository in format owner/repo
 
         Returns:
-            Latest commit SHA
+            Tuple of (commit_sha, clone_path)
 
         Raises:
             Exception: If repository cannot be cloned
         """
         try:
-            # Get repository details
-            repo_data = self.github_client.get_repository(repository)
-            default_branch = repo_data.get("default_branch", "main")
+            # Get repository details from GitHub API
+            repo = self.github_client.get_repository(repository)
+            default_branch = repo.default_branch
 
-            # Clone repository to temp directory
-            clone_path = f"/tmp/deploymind/{repository.replace('/', '_')}"
+            # Clone repository to temp directory with unique ID
+            import uuid
+            import tempfile
+            import os
+            unique_id = str(uuid.uuid4())[:8]
+
+            # Use cross-platform temp directory
+            temp_base = tempfile.gettempdir()
+            clone_path = os.path.join(temp_base, "deploymind", f"{repository.replace('/', '_')}_{unique_id}")
+
             self.github_client.clone_repository(repository, clone_path)
 
-            # Get latest commit SHA
-            commit_sha = repo_data.get("default_branch_commit_sha", "latest")
+            # Get latest commit SHA from default branch
+            commit_sha = repo.get_branch(default_branch).commit.sha
 
             logger.info(
                 "Repository cloned successfully",
                 extra={
                     "repository": repository,
                     "commit_sha": commit_sha,
-                    "branch": default_branch
+                    "branch": default_branch,
+                    "clone_path": clone_path
                 }
             )
 
-            return commit_sha
+            return commit_sha, clone_path
 
         except Exception as e:
             logger.error(
@@ -335,7 +355,7 @@ class FullDeploymentWorkflow:
             raise
 
     def _execute_security_scan(
-        self, deployment_id: str, repository: str, commit_sha: str
+        self, deployment_id: str, repository: str, commit_sha: str, clone_path: str
     ) -> dict:
         """Execute security scan phase.
 
@@ -343,6 +363,7 @@ class FullDeploymentWorkflow:
             deployment_id: Unique deployment ID
             repository: Repository name
             commit_sha: Commit SHA to scan
+            clone_path: Path to cloned repository
 
         Returns:
             Dictionary with scan results
@@ -354,11 +375,9 @@ class FullDeploymentWorkflow:
 
         try:
             # Scan the cloned repository filesystem
-            target_path = f"/tmp/deploymind/{repository.replace('/', '_')}"
-
             scan_request = SecurityScanRequest(
                 deployment_id=deployment_id,
-                target=target_path,
+                target=clone_path,
                 scan_type="filesystem",
                 policy="strict"
             )
@@ -395,7 +414,7 @@ class FullDeploymentWorkflow:
             }
 
     def _execute_build(
-        self, deployment_id: str, repository: str, commit_sha: str
+        self, deployment_id: str, repository: str, commit_sha: str, clone_path: str
     ) -> dict:
         """Execute Docker build phase.
 
@@ -403,6 +422,7 @@ class FullDeploymentWorkflow:
             deployment_id: Unique deployment ID
             repository: Repository name
             commit_sha: Commit SHA to build
+            clone_path: Path to cloned repository
 
         Returns:
             Dictionary with build results
@@ -413,15 +433,12 @@ class FullDeploymentWorkflow:
         })
 
         try:
-            # Generate image tag from repository and commit
-            image_tag = f"{repository.replace('/', '-')}:{commit_sha[:8]}"
-
-            # Project path from cloned repository
-            project_path = f"/tmp/deploymind/{repository.replace('/', '_')}"
+            # Generate image tag from repository and commit (lowercase for Docker)
+            image_tag = f"{repository.replace('/', '-')}:{commit_sha[:8]}".lower()
 
             build_request = BuildRequest(
                 deployment_id=deployment_id,
-                project_path=project_path,
+                project_path=clone_path,
                 image_tag=image_tag,
                 analyze_with_ai=False  # Skip AI analysis for speed
             )
@@ -471,7 +488,9 @@ class FullDeploymentWorkflow:
         instance_id: str,
         image_tag: str,
         port: int,
-        health_check_path: str
+        health_check_path: str,
+        repository: str = None,
+        dockerfile_content: str = None
     ) -> dict:
         """Execute deployment to EC2 phase.
 
@@ -481,6 +500,8 @@ class FullDeploymentWorkflow:
             image_tag: Docker image tag to deploy
             port: Application port
             health_check_path: Health check endpoint path
+            repository: GitHub repository for building on instance
+            dockerfile_content: Dockerfile content for building on instance
 
         Returns:
             Dictionary with deployment results
@@ -497,7 +518,10 @@ class FullDeploymentWorkflow:
                 instance_id=instance_id,
                 image_tag=image_tag,
                 port=port,
-                health_check_path=health_check_path
+                health_check_path=health_check_path,
+                repository=repository,
+                dockerfile_content=dockerfile_content,
+                build_on_instance=True  # Always build on instance for now
             )
 
             deploy_response = self.deploy_use_case.execute(deploy_request)

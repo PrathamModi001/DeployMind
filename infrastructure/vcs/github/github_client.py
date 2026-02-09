@@ -86,7 +86,18 @@ class GitHubClient:
         if target_dir is None:
             target_dir = tempfile.mkdtemp(prefix=f"deploymind-{repo.name}-")
         else:
-            os.makedirs(target_dir, exist_ok=True)
+            # Clean up existing directory if it exists
+            if os.path.exists(target_dir):
+                import shutil
+                logger.info(f"Removing existing directory: {target_dir}")
+                try:
+                    shutil.rmtree(target_dir, ignore_errors=True)
+                except Exception as e:
+                    logger.warning(f"Could not remove directory: {e}")
+
+            # Ensure parent directory exists
+            parent_dir = os.path.dirname(target_dir)
+            os.makedirs(parent_dir, exist_ok=True)
 
         # Clone using git command
         logger.info(f"Cloning repository {repo_full_name} to {target_dir}")

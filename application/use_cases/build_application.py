@@ -106,12 +106,16 @@ class BuildApplicationUseCase:
 
             if not dockerfile_path.exists():
                 logger.info("Dockerfile not found, generating optimized Dockerfile")
-                self.dockerfile_optimizer.generate_dockerfile(
+                dockerfile_content = self.dockerfile_optimizer.optimize(
                     project_path=str(project_path),
-                    project_info=project_info
+                    project_info=project_info,
+                    existing_dockerfile=None
                 )
+                logger.info("Dockerfile generated successfully")
             else:
-                logger.info("Dockerfile exists, will use existing file")
+                logger.info("Dockerfile exists, reading existing file")
+                with open(dockerfile_path, 'r') as f:
+                    dockerfile_content = f.read()
 
             # Step 3: Build Docker image
             logger.info("Building Docker image")
@@ -125,10 +129,12 @@ class BuildApplicationUseCase:
                 timestamp = int(time.time())
                 image_tag = f"deploymind-{project_info.language}-{timestamp}"
 
-            build_result = self.docker_builder.build_image(
-                context_path=str(project_path),
-                dockerfile_path=str(dockerfile_path),
-                tag=image_tag
+            build_result = self.docker_builder.build(
+                project_path=str(project_path),
+                project_info=project_info,
+                dockerfile_content=dockerfile_content,
+                tag=image_tag,
+                stream_logs=False  # Disable streaming for cleaner logs
             )
 
             if not build_result.success:

@@ -2,6 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## IMPORTANT USER PREFERENCES
+
+**Git Operations:**
+- ❌ DO NOT commit or push to git
+- ❌ DO NOT run any git commands
+- User will handle all git operations manually
+
+**Documentation:**
+- ❌ DO NOT create new .md files unless explicitly requested
+- Only modify existing documentation when necessary
+
 ## Commands
 
 ### Environment Setup
