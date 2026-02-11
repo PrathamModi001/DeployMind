@@ -133,8 +133,8 @@ echo "DeployMind EC2 setup complete!"
     print("   Launching EC2 instance...")
     response = ec2.run_instances(
         ImageId='ami-0e670eb768a5fc3d4',  # Ubuntu 24.04 LTS in ap-south-1
-        InstanceType='t2.micro',
-        KeyName='',  # No key pair needed for SSM
+        InstanceType='t3.micro',  # Free tier eligible
+        # KeyName not needed - using SSM for access
         SecurityGroupIds=[sg_id],
         MinCount=1,
         MaxCount=1,

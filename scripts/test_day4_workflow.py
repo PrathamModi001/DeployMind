@@ -56,7 +56,7 @@ def main():
     print_header("TEST CONFIGURATION")
 
     # Use the existing EC2 instance
-    instance_id = "i-0ee9185b15eea1604"
+    instance_id = "i-04a247b654b971a40"
     repository = "PrathamModi001/DeployMind"
 
     print(f"Repository: {repository}")

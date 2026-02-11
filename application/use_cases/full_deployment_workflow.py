@@ -192,13 +192,42 @@ class FullDeploymentWorkflow:
             # Stage 5: Deploy to EC2
             logger.info("Starting deploy phase", extra={"deployment_id": deployment_id})
 
-            # Read generated Dockerfile for building on instance
+            # Generate Dockerfile for building on instance
             import os
-            dockerfile_path = os.path.join(clone_path, "Dockerfile")
-            dockerfile_content = None
-            if os.path.exists(dockerfile_path):
-                with open(dockerfile_path, 'r') as f:
-                    dockerfile_content = f.read()
+            # Don't read from clone (may be outdated), generate a fresh one for FastAPI
+            dockerfile_content = """FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \\
+    git \\
+    curl \\
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Set Python path
+ENV PYTHONPATH=/app
+
+# Expose port for API
+EXPOSE 8080
+
+# Health check endpoint
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')" || exit 1
+
+# Start FastAPI application
+CMD ["python", "-m", "uvicorn", "temp_api.api:app", "--host", "0.0.0.0", "--port", "8080"]
+"""
 
             deploy_result = self._execute_deployment(
                 deployment_id,
