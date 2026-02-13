@@ -23,6 +23,7 @@ from application.use_cases.deploy_application import DeployApplicationUseCase, D
 from domain.entities.deployment import Deployment
 from shared.validators import SecurityValidator
 from shared.exceptions import ValidationError, SecurityScanError, BuildError, DeploymentError
+from shared.cleanup import get_cleanup_manager
 from core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -172,6 +173,10 @@ class FullDeploymentWorkflow:
             deployment_id=deployment_id,
             repository=request.repository
         )
+
+        # Track resources for cleanup
+        clone_path = None
+        cleanup_manager = get_cleanup_manager()
 
         try:
             # Stage 1: Validate inputs
@@ -408,6 +413,12 @@ CMD ["python", "-m", "uvicorn", "temp_api.api:app", "--host", "0.0.0.0", "--port
                 "reason": str(e)
             })
             return response
+
+        finally:
+            # Always cleanup temporary files, even on error
+            if clone_path:
+                cleanup_manager.cleanup_temp_repository(clone_path)
+                logger.info("Cleaned up temporary repository", extra={"clone_path": clone_path})
 
     def _validate_request(self, request: FullDeploymentRequest) -> None:
         """Validate all inputs before starting workflow.

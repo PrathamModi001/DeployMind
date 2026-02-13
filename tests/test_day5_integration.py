@@ -97,10 +97,12 @@ class TestFullDeploymentWorkflow:
         workflow = full_deployment_workflow
 
         # Mock GitHub clone
-        workflow.github_client.get_repository.return_value = {
-            "default_branch": "main",
-            "default_branch_commit_sha": "abc123def456"
-        }
+        mock_repo = Mock()
+        mock_repo.default_branch = "main"
+        mock_branch = Mock()
+        mock_branch.commit.sha = "abc123def456"
+        mock_repo.get_branch.return_value = mock_branch
+        workflow.github_client.get_repository.return_value = mock_repo
         workflow.github_client.clone_repository.return_value = None
 
         # Mock security scan - PASS
@@ -159,10 +161,12 @@ class TestFullDeploymentWorkflow:
         workflow = full_deployment_workflow
 
         # Mock GitHub clone
-        workflow.github_client.get_repository.return_value = {
-            "default_branch": "main",
-            "default_branch_commit_sha": "abc123def456"
-        }
+        mock_repo = Mock()
+        mock_repo.default_branch = "main"
+        mock_branch = Mock()
+        mock_branch.commit.sha = "abc123def456"
+        mock_repo.get_branch.return_value = mock_branch
+        workflow.github_client.get_repository.return_value = mock_repo
         workflow.github_client.clone_repository.return_value = None
 
         # Mock security scan - FAIL
@@ -196,10 +200,12 @@ class TestFullDeploymentWorkflow:
         workflow = full_deployment_workflow
 
         # Mock GitHub clone
-        workflow.github_client.get_repository.return_value = {
-            "default_branch": "main",
-            "default_branch_commit_sha": "abc123def456"
-        }
+        mock_repo = Mock()
+        mock_repo.default_branch = "main"
+        mock_branch = Mock()
+        mock_branch.commit.sha = "abc123def456"
+        mock_repo.get_branch.return_value = mock_branch
+        workflow.github_client.get_repository.return_value = mock_repo
         workflow.github_client.clone_repository.return_value = None
 
         # Mock security scan - PASS
@@ -214,6 +220,7 @@ class TestFullDeploymentWorkflow:
         build_response = Mock()
         build_response.success = False
         build_response.image_tag = None
+        build_response.build_result = None  # No build result on failure
         build_response.message = "Dockerfile syntax error at line 15"
         workflow.build_use_case.execute.return_value = build_response
 
@@ -240,10 +247,12 @@ class TestFullDeploymentWorkflow:
         workflow = full_deployment_workflow
 
         # Mock GitHub clone
-        workflow.github_client.get_repository.return_value = {
-            "default_branch": "main",
-            "default_branch_commit_sha": "abc123def456"
-        }
+        mock_repo = Mock()
+        mock_repo.default_branch = "main"
+        mock_branch = Mock()
+        mock_branch.commit.sha = "abc123def456"
+        mock_repo.get_branch.return_value = mock_branch
+        workflow.github_client.get_repository.return_value = mock_repo
         workflow.github_client.clone_repository.return_value = None
 
         # Mock security scan - PASS
@@ -509,10 +518,12 @@ class TestPipelineErrorHandling:
         workflow = full_deployment_workflow
 
         # Mock GitHub clone success
-        workflow.github_client.get_repository.return_value = {
-            "default_branch": "main",
-            "default_branch_commit_sha": "abc123"
-        }
+        mock_repo = Mock()
+        mock_repo.default_branch = "main"
+        mock_branch = Mock()
+        mock_branch.commit.sha = "abc123def456"
+        mock_repo.get_branch.return_value = mock_branch
+        workflow.github_client.get_repository.return_value = mock_repo
 
         # Mock security scan exception
         workflow.security_scan_use_case.execute.side_effect = Exception("Trivy scanner unavailable")

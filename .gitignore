@@ -55,5 +55,15 @@ logs/
 tools/trivy.exe
 tools/trivy
 tools/*.exe
+tools/contrib/*.tpl
 
+# Trivy binary and cache (downloaded automatically)
+bin/trivy.exe
+bin/trivy
+bin/*.exe
+bin/contrib/*.tpl
+.trivy-cache/
+
+# Temporary files
+*.tpl
 nul

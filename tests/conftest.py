@@ -56,3 +56,25 @@ def env_vars(tmp_path):
             os.environ.pop(key, None)
         else:
             os.environ[key] = orig_value
+
+
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_after_tests():
+    """Cleanup temporary files after all tests complete."""
+    yield  # Run all tests first
+
+    # Cleanup after all tests
+    try:
+        from shared.cleanup import get_cleanup_manager
+        cleanup_manager = get_cleanup_manager()
+
+        # Clean up test artifacts
+        stats = cleanup_manager.cleanup_all(
+            trivy_cache_max_age_days=0,    # Clean all cache after tests
+            temp_repos_max_age_hours=0,     # Clean all temp repos
+            cleanup_docker=False            # Don't cleanup Docker in tests
+        )
+
+        print(f"\n✅ Test cleanup: Freed {round(stats['total_space_freed_mb'], 2)} MB")
+    except Exception as e:
+        print(f"\n⚠️  Test cleanup warning: {e}")

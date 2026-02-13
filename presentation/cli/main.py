@@ -5,6 +5,7 @@ Production CLI for deploying applications with AI-powered deployment pipeline.
 
 import sys
 from pathlib import Path
+import platform
 
 # Add project root to Python path
 project_root = Path(__file__).parent.parent.parent
@@ -14,7 +15,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 from rich.live import Live
 from rich.layout import Layout
 from rich import box
@@ -31,7 +32,9 @@ from application.use_cases.full_deployment_workflow import (
 from application.analytics.deployment_analytics import DeploymentAnalytics
 from core.logger import get_logger
 
-console = Console()
+# Configure console for Windows compatibility
+# Use legacy_windows=False to avoid Unicode spinner issues on Windows
+console = Console(legacy_windows=False, force_terminal=True)
 logger = get_logger(__name__)
 
 
@@ -177,19 +180,21 @@ def deploy(ctx, repository, instance, port, health_path, strategy, environment, 
         )
 
         # Execute deployment with progress tracking
+        # Note: Removed SpinnerColumn to avoid Unicode encoding issues on Windows
+        # Windows cp1252 encoding can't handle Unicode spinner characters
         with Progress(
-            SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             console=console,
+            transient=True,
         ) as progress:
             # Phase 1: Security Scan
-            task1 = progress.add_task("[cyan]SECURITY Security scanning...", total=None)
+            task1 = progress.add_task("[cyan]>> SECURITY Security scanning...", total=None)
 
             # Phase 2: Build
-            task2 = progress.add_task("[cyan]BUILD Building Docker image...", total=None)
+            task2 = progress.add_task("[cyan]>> BUILD Building Docker image...", total=None)
 
             # Phase 3: Deploy
-            task3 = progress.add_task("[cyan]DEPLOY Deploying to EC2...", total=None)
+            task3 = progress.add_task("[cyan]>> DEPLOY Deploying to EC2...", total=None)
 
             # Execute workflow
             response = workflow.execute(request)

@@ -212,18 +212,18 @@ class SecurityScanUseCase:
         """
         if decision.decision == "approve":
             return (
-                f"✅ Security scan passed (risk score: {decision.risk_score}/100). "
+                f"[PASS] Security scan passed (risk score: {decision.risk_score}/100). "
                 f"Reasoning: {decision.reasoning}"
             )
         elif decision.decision == "warn":
             issues = ", ".join(decision.critical_issues[:3])
             return (
-                f"⚠️ Security scan passed with warnings (risk score: {decision.risk_score}/100). "
+                f"[WARN] Security scan passed with warnings (risk score: {decision.risk_score}/100). "
                 f"Issues: {issues}. {decision.reasoning}"
             )
         else:  # reject
             issues = ", ".join(decision.critical_issues[:3])
             return (
-                f"❌ Security scan rejected (risk score: {decision.risk_score}/100). "
+                f"[REJECT] Security scan rejected (risk score: {decision.risk_score}/100). "
                 f"Critical issues: {issues}. {decision.reasoning}"
             )
