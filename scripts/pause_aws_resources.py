@@ -18,9 +18,13 @@ from typing import List, Dict, Any
 
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
+from dotenv import load_dotenv
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Load environment variables from .env file
+load_dotenv()
 
 from shared.secure_logging import get_logger
 

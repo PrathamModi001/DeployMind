@@ -7,7 +7,9 @@
 - **Saturday-Sunday**: Heavy development (Frontend + API)
 - **Monday-Wednesday**: Integration, Testing, Polish
 
-**Theme**: Futuristic cyberpunk aesthetic with **black background** and **purple accents** (#9333EA, #7C3AED, #C084FC)
+**Design Inspiration**: **Claude AI Interface** - Simple, clean, professional
+**Theme**: Dark theme with **subtle purple hints** (not dominant, just accents)
+**Philosophy**: Minimal, readable, no gimmicks - focus on functionality and elegance
 
 ---
 
@@ -104,12 +106,13 @@
 - Dark mode native
 - Responsive by default
 
-**Futuristic Components**:
-- Framer Motion (animations, transitions)
-- Aceternity UI (cyberpunk components)
-- Particles.js (background effects)
-- Three.js (3D elements for dashboard)
-- React Flow (deployment pipeline visualization)
+**UI Components** (Claude-Inspired - Simple & Elegant):
+- Framer Motion (subtle animations only - no heavy effects)
+- Minimal shadows and borders
+- Clean typography (Inter or Geist font)
+- No particle effects or 3D elements
+- Simple, functional design
+- Focus on content and readability
 
 **State Management**: Zustand (lightweight, fast)
 
@@ -123,38 +126,54 @@
 - Real-time logs streaming
 - Health check updates
 
-**Charts**: Recharts + D3.js
+**Charts**: Recharts (simple, clean charts)
 - Deployment analytics
 - Performance metrics
 - Cost tracking
 
-**Color Palette** (Futuristic Purple Theme):
+**Design Philosophy** (Inspired by Claude AI):
+- **Simplicity First**: Clean, uncluttered interface
+- **Readability**: Clear typography, proper spacing
+- **Subtle Interactions**: Minimal animations, smooth transitions
+- **Dark Theme**: Easy on the eyes, professional look
+- **Purple Hints**: Accent color, not dominant
+- **No Gimmicks**: No particle effects, heavy animations, or glow effects
+
+**Color Palette** (Claude-Style Dark Theme with Purple Hints):
 ```css
-/* Primary Colors */
---background: #0A0A0F;           /* Deep black */
---surface: #1A1A24;              /* Dark gray-purple */
---surface-elevated: #24243A;     /* Elevated surface */
+/* Base Colors (Claude-inspired) */
+--background: #1E1E1E;           /* Soft dark gray (not pure black) */
+--surface: #2A2A2A;              /* Slightly lighter for cards */
+--surface-hover: #323232;        /* Subtle hover state */
+--surface-elevated: #353535;     /* Elevated elements */
 
-/* Purple Accents */
---primary: #9333EA;              /* Vibrant purple */
---primary-dark: #7C3AED;         /* Deep purple */
---primary-light: #C084FC;        /* Light purple */
---primary-glow: rgba(147, 51, 234, 0.3);  /* Purple glow */
+/* Purple Accents (Subtle, like Claude) */
+--primary: #A78BFA;              /* Soft purple (not vibrant) */
+--primary-hover: #C4B5FD;        /* Lighter on hover */
+--primary-muted: #8B5CF6;        /* Muted purple for backgrounds */
+--primary-subtle: rgba(167, 139, 250, 0.1);  /* Very subtle purple tint */
 
-/* Status Colors */
---success: #10B981;              /* Green */
---warning: #F59E0B;              /* Amber */
---error: #EF4444;                /* Red */
---info: #3B82F6;                 /* Blue */
+/* Status Colors (Muted) */
+--success: #4ADE80;              /* Soft green */
+--warning: #FBBF24;              /* Soft amber */
+--error: #F87171;                /* Soft red */
+--info: #60A5FA;                 /* Soft blue */
 
-/* Text */
---text-primary: #F3F4F6;         /* Light gray */
---text-secondary: #9CA3AF;       /* Medium gray */
---text-muted: #6B7280;           /* Dark gray */
+/* Text (High readability) */
+--text-primary: #E5E5E5;         /* Soft white (not pure) */
+--text-secondary: #A3A3A3;       /* Gray for secondary text */
+--text-muted: #737373;           /* Darker gray for muted text */
+--text-disabled: #525252;        /* Disabled state */
 
-/* Borders */
---border: #2D2D44;               /* Subtle border */
---border-glow: rgba(147, 51, 234, 0.5);  /* Purple border glow */
+/* Borders (Subtle) */
+--border: #404040;               /* Subtle gray border */
+--border-hover: #525252;         /* Slightly visible on hover */
+--border-focus: #A78BFA;         /* Purple on focus */
+
+/* Shadows (Very subtle) */
+--shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
+--shadow-md: 0 2px 4px rgba(0, 0, 0, 0.2);
+--shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.3);
 ```
 
 ---
@@ -341,37 +360,51 @@
      };
 
      return (
-       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-surface to-background">
-         <div className="w-full max-w-md p-8 bg-surface border border-border rounded-2xl shadow-2xl">
-           <h1 className="text-4xl font-bold text-center mb-2 bg-gradient-to-r from-primary to-primaryLight bg-clip-text text-transparent">
-             DeployMind
-           </h1>
-           <p className="text-center text-text-secondary mb-8">
-             AI-Powered Deployment Platform
-           </p>
+       <div className="min-h-screen flex items-center justify-center bg-background">
+         <div className="w-full max-w-md p-8 bg-surface border border-border rounded-lg">
+           <div className="mb-8">
+             <h1 className="text-3xl font-semibold text-text-primary mb-2">
+               DeployMind
+             </h1>
+             <p className="text-text-secondary text-sm">
+               AI-powered deployment platform
+             </p>
+           </div>
 
-           <Input
-             type="email"
-             placeholder="Email"
-             value={email}
-             onChange={(e) => setEmail(e.target.value)}
-             className="mb-4 bg-background border-border"
-           />
+           <div className="space-y-4">
+             <div>
+               <label className="text-sm text-text-secondary mb-1.5 block">
+                 Email
+               </label>
+               <Input
+                 type="email"
+                 placeholder="you@example.com"
+                 value={email}
+                 onChange={(e) => setEmail(e.target.value)}
+                 className="bg-background border-border focus:border-primary"
+               />
+             </div>
 
-           <Input
-             type="password"
-             placeholder="Password"
-             value={password}
-             onChange={(e) => setPassword(e.target.value)}
-             className="mb-6 bg-background border-border"
-           />
+             <div>
+               <label className="text-sm text-text-secondary mb-1.5 block">
+                 Password
+               </label>
+               <Input
+                 type="password"
+                 placeholder="••••••••"
+                 value={password}
+                 onChange={(e) => setPassword(e.target.value)}
+                 className="bg-background border-border focus:border-primary"
+               />
+             </div>
 
-           <Button
-             onClick={handleLogin}
-             className="w-full bg-primary hover:bg-primaryDark text-white"
-           >
-             Sign In
-           </Button>
+             <Button
+               onClick={handleLogin}
+               className="w-full bg-primary hover:bg-primary-hover text-white font-medium mt-6"
+             >
+               Sign in
+             </Button>
+           </div>
          </div>
        </div>
      );
@@ -740,9 +773,9 @@ deploymind/
 
 ---
 
-## 🎨 UI Component Examples
+## 🎨 UI Component Examples (Claude-Inspired)
 
-### Dashboard Stats Card
+### Dashboard Stats Card (Simple & Clean)
 ```tsx
 interface StatsCardProps {
   title: string;
@@ -753,49 +786,45 @@ interface StatsCardProps {
 
 export function StatsCard({ title, value, change, icon }: StatsCardProps) {
   return (
-    <motion.div
-      whileHover={{ scale: 1.02 }}
-      className="bg-surface border border-border rounded-xl p-6 relative overflow-hidden group"
-    >
-      {/* Purple glow effect */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/0 to-primary/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-
-      <div className="relative z-10">
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-text-secondary text-sm">{title}</p>
-          <div className="text-primary">{icon}</div>
-        </div>
-
-        <p className="text-3xl font-bold text-text-primary mb-2">{value}</p>
-
-        <div className="flex items-center text-sm">
-          {change >= 0 ? (
-            <ArrowUp className="w-4 h-4 text-success mr-1" />
-          ) : (
-            <ArrowDown className="w-4 h-4 text-error mr-1" />
-          )}
-          <span className={change >= 0 ? 'text-success' : 'text-error'}>
-            {Math.abs(change)}%
-          </span>
-          <span className="text-text-muted ml-2">vs last month</span>
-        </div>
+    <div className="bg-surface border border-border rounded-lg p-6 hover:bg-surface-hover transition-colors">
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-text-secondary text-sm font-medium">{title}</p>
+        <div className="text-text-muted">{icon}</div>
       </div>
 
-      {/* Animated border glow */}
-      <div className="absolute inset-0 border-2 border-transparent group-hover:border-primary/50 rounded-xl transition-all duration-300" />
-    </motion.div>
+      <p className="text-3xl font-semibold text-text-primary mb-2">{value}</p>
+
+      <div className="flex items-center text-sm">
+        {change >= 0 ? (
+          <ArrowUp className="w-4 h-4 text-success mr-1" />
+        ) : (
+          <ArrowDown className="w-4 h-4 text-error mr-1" />
+        )}
+        <span className={change >= 0 ? 'text-success' : 'text-error'}>
+          {Math.abs(change)}%
+        </span>
+        <span className="text-text-muted ml-2">vs last month</span>
+      </div>
+    </div>
   );
 }
 ```
 
-### Deployment Status Badge
+**Design Notes**:
+- No scaling animations or glow effects
+- Simple hover state (background color change)
+- Clean borders, no fancy gradients
+- Readable typography with proper hierarchy
+- Subtle transitions (colors only)
+
+### Deployment Status Badge (Minimal)
 ```tsx
 const statusConfig = {
-  PENDING: { color: 'bg-yellow-500/20 text-yellow-400', icon: Clock },
-  BUILDING: { color: 'bg-blue-500/20 text-blue-400', icon: Hammer },
-  DEPLOYING: { color: 'bg-purple-500/20 text-purple-400', icon: Rocket },
-  DEPLOYED: { color: 'bg-green-500/20 text-green-400', icon: CheckCircle },
-  FAILED: { color: 'bg-red-500/20 text-red-400', icon: XCircle },
+  PENDING: { color: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20', icon: Clock },
+  BUILDING: { color: 'bg-blue-500/10 text-blue-500 border-blue-500/20', icon: Hammer },
+  DEPLOYING: { color: 'bg-primary-subtle text-primary border-primary/20', icon: Rocket },
+  DEPLOYED: { color: 'bg-success/10 text-success border-success/20', icon: CheckCircle },
+  FAILED: { color: 'bg-error/10 text-error border-error/20', icon: XCircle },
 };
 
 export function StatusBadge({ status }: { status: string }) {
@@ -803,63 +832,64 @@ export function StatusBadge({ status }: { status: string }) {
   const Icon = config.icon;
 
   return (
-    <motion.div
-      initial={{ scale: 0.9, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      className={`inline-flex items-center gap-2 px-3 py-1 rounded-full ${config.color}`}
-    >
-      <Icon className="w-4 h-4" />
-      <span className="font-medium">{status}</span>
-    </motion.div>
+    <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md border ${config.color}`}>
+      <Icon className="w-3.5 h-3.5" />
+      <span className="text-xs font-medium">{status}</span>
+    </div>
   );
 }
 ```
 
-### Live Log Terminal
+**Design Notes**:
+- No animations (instant display)
+- Subtle background colors with borders
+- Smaller, more refined appearance
+- Proper spacing and sizing
+- Clean, readable status indicators
+
+
+### Live Log Terminal (Clean & Readable)
 ```tsx
 export function LogTerminal({ logs }: { logs: string[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Auto-scroll to bottom
-    containerRef.current?.scrollTo({
-      top: containerRef.current.scrollHeight,
-      behavior: 'smooth',
-    });
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
   }, [logs]);
 
   return (
     <div
       ref={containerRef}
-      className="bg-black/80 backdrop-blur-sm border border-primary/30 rounded-lg p-4 h-96 overflow-auto font-mono text-xs"
+      className="bg-[#0D0D0D] border border-border rounded-lg p-4 h-96 overflow-auto font-mono text-sm"
     >
       {logs.map((log, i) => (
-        <motion.div
-          key={i}
-          initial={{ opacity: 0, x: -10 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.2 }}
-          className="mb-1"
-        >
-          <span className="text-text-muted mr-2">
-            [{new Date().toLocaleTimeString()}]
+        <div key={i} className="mb-1 leading-relaxed">
+          <span className="text-text-muted mr-3">
+            {new Date().toLocaleTimeString()}
           </span>
-          <span className="text-green-400">{log}</span>
-        </motion.div>
+          <span className="text-text-secondary">{log}</span>
+        </div>
       ))}
 
-      {/* Blinking cursor */}
-      <motion.span
-        animate={{ opacity: [1, 0] }}
-        transition={{ duration: 0.8, repeat: Infinity }}
-        className="text-primary"
-      >
-        ▊
-      </motion.span>
+      {/* Simple cursor indicator */}
+      <span className="inline-block w-2 h-4 bg-primary/50 animate-pulse" />
     </div>
   );
 }
 ```
+
+**Design Notes**:
+- No backdrop blur or fancy effects
+- Simple dark background (not black/80)
+- No slide-in animations (instant display for performance)
+- Clean monospace font, readable size (text-sm not text-xs)
+- Standard pulse animation for cursor
+- Proper line height for readability
+- Clean timestamp formatting
+
 
 ---
 
