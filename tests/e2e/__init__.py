@@ -1,1 +1,1 @@
-"""Package initialization."""
+"""End-to-end test suite for DeployMind."""

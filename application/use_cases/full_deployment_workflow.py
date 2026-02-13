@@ -14,11 +14,13 @@ from typing import Optional
 import uuid
 
 from config.settings import Settings
+from config.dependencies import container
 from infrastructure.vcs.github.github_client import GitHubClient
 from infrastructure.cache.redis_client import RedisClient
 from application.use_cases.scan_security import SecurityScanUseCase, SecurityScanRequest
 from application.use_cases.build_application import BuildApplicationUseCase, BuildRequest
 from application.use_cases.deploy_application import DeployApplicationUseCase, DeployRequest
+from domain.entities.deployment import Deployment
 from shared.validators import SecurityValidator
 from shared.exceptions import ValidationError, SecurityScanError, BuildError, DeploymentError
 from core.logger import get_logger
@@ -86,6 +88,12 @@ class FullDeploymentWorkflow:
         self.github_client = GitHubClient(settings)
         self.redis_client = RedisClient(settings.redis_url)
 
+        # Repositories for persistence
+        self.deployment_repo = container.deployment_repo
+        self.security_scan_repo = container.security_scan_repo
+        self.build_result_repo = container.build_result_repo
+        self.health_check_repo = container.health_check_repo
+
         # Use cases
         self.security_scan_use_case = SecurityScanUseCase(settings)
         self.build_use_case = BuildApplicationUseCase(settings)
@@ -128,6 +136,29 @@ class FullDeploymentWorkflow:
             }
         )
 
+        # Create deployment entity
+        deployment = Deployment(
+            id=deployment_id,
+            repository=request.repository,
+            instance_id=request.instance_id,
+            status="pending",
+            created_at=start_time,
+            updated_at=start_time
+        )
+
+        # Add optional fields as attributes
+        deployment.strategy = request.strategy
+        deployment.triggered_by = "manual"
+        deployment.trigger_type = "manual"
+        deployment.started_at = start_time
+
+        # Persist to database
+        try:
+            self.deployment_repo.create(deployment)
+            logger.info("Deployment record created", extra={"deployment_id": deployment_id})
+        except Exception as e:
+            logger.error("Failed to create deployment record", extra={"error": str(e)}, exc_info=True)
+
         # Publish start event
         self._publish_event("deployment_started", {
             "deployment_id": deployment_id,
@@ -153,6 +184,15 @@ class FullDeploymentWorkflow:
 
             # Stage 3: Security scan (BLOCKING)
             logger.info("Starting security scan phase", extra={"deployment_id": deployment_id})
+
+            # Update deployment status
+            deployment.status = "security_scanning"
+            deployment.updated_at = datetime.now()
+            try:
+                self.deployment_repo.update(deployment)
+            except Exception as e:
+                logger.warning("Failed to update deployment status", extra={"error": str(e)})
+
             security_result = self._execute_security_scan(
                 deployment_id, request.repository, commit_sha, clone_path
             )
@@ -163,6 +203,17 @@ class FullDeploymentWorkflow:
             if not security_result["passed"]:
                 response.error_phase = "security"
                 response.error_message = security_result["error"]
+
+                # Update deployment status to failed
+                deployment.status = "failed"
+                deployment.updated_at = datetime.now()
+                deployment.completed_at = datetime.now()
+                deployment.duration_seconds = (deployment.completed_at - start_time).total_seconds()
+                try:
+                    self.deployment_repo.update(deployment)
+                except Exception as e:
+                    logger.warning("Failed to update deployment status", extra={"error": str(e)})
+
                 self._publish_event("deployment_failed", {
                     "deployment_id": deployment_id,
                     "phase": "security",
@@ -172,6 +223,15 @@ class FullDeploymentWorkflow:
 
             # Stage 4: Build Docker image
             logger.info("Starting build phase", extra={"deployment_id": deployment_id})
+
+            # Update deployment status
+            deployment.status = "building"
+            deployment.updated_at = datetime.now()
+            try:
+                self.deployment_repo.update(deployment)
+            except Exception as e:
+                logger.warning("Failed to update deployment status", extra={"error": str(e)})
+
             build_result = self._execute_build(
                 deployment_id, request.repository, commit_sha, clone_path
             )
@@ -179,9 +239,25 @@ class FullDeploymentWorkflow:
             response.image_tag = build_result["image_tag"]
             response.image_size_mb = build_result["image_size_mb"]
 
+            # Update deployment with image info
+            if build_result["success"] and build_result["image_tag"]:
+                deployment.image_tag = build_result["image_tag"]
+                deployment.image_size_mb = build_result["image_size_mb"]
+
             if not build_result["success"]:
                 response.error_phase = "build"
                 response.error_message = build_result["error"]
+
+                # Update deployment status to failed
+                deployment.status = "failed"
+                deployment.updated_at = datetime.now()
+                deployment.completed_at = datetime.now()
+                deployment.duration_seconds = (deployment.completed_at - start_time).total_seconds()
+                try:
+                    self.deployment_repo.update(deployment)
+                except Exception as e:
+                    logger.warning("Failed to update deployment status", extra={"error": str(e)})
+
                 self._publish_event("deployment_failed", {
                     "deployment_id": deployment_id,
                     "phase": "build",
@@ -191,6 +267,14 @@ class FullDeploymentWorkflow:
 
             # Stage 5: Deploy to EC2
             logger.info("Starting deploy phase", extra={"deployment_id": deployment_id})
+
+            # Update deployment status
+            deployment.status = "deploying"
+            deployment.updated_at = datetime.now()
+            try:
+                self.deployment_repo.update(deployment)
+            except Exception as e:
+                logger.warning("Failed to update deployment status", extra={"error": str(e)})
 
             # Generate Dockerfile for building on instance
             import os
@@ -247,6 +331,19 @@ CMD ["python", "-m", "uvicorn", "temp_api.api:app", "--host", "0.0.0.0", "--port
             if not deploy_result["success"]:
                 response.error_phase = "deploy"
                 response.error_message = deploy_result["error"]
+
+                # Update deployment status to failed
+                deployment.status = "failed"
+                deployment.updated_at = datetime.now()
+                deployment.completed_at = datetime.now()
+                deployment.duration_seconds = (deployment.completed_at - start_time).total_seconds()
+                if response.rollback_performed:
+                    deployment.rollback_reason = "Health check failed"
+                try:
+                    self.deployment_repo.update(deployment)
+                except Exception as e:
+                    logger.warning("Failed to update deployment status", extra={"error": str(e)})
+
                 self._publish_event("deployment_failed", {
                     "deployment_id": deployment_id,
                     "phase": "deploy",
@@ -259,6 +356,17 @@ CMD ["python", "-m", "uvicorn", "temp_api.api:app", "--host", "0.0.0.0", "--port
             response.success = True
             duration = (datetime.now() - start_time).total_seconds()
             response.duration_seconds = duration
+
+            # Update deployment status to deployed
+            deployment.status = "deployed"
+            deployment.updated_at = datetime.now()
+            deployment.completed_at = datetime.now()
+            deployment.duration_seconds = duration
+            try:
+                self.deployment_repo.update(deployment)
+                logger.info("Deployment status updated to deployed", extra={"deployment_id": deployment_id})
+            except Exception as e:
+                logger.warning("Failed to update deployment status", extra={"error": str(e)})
 
             logger.info(
                 "Deployment completed successfully",
@@ -413,6 +521,29 @@ CMD ["python", "-m", "uvicorn", "temp_api.api:app", "--host", "0.0.0.0", "--port
 
             scan_response = self.security_scan_use_case.execute(scan_request)
 
+            # Store scan results in database
+            if scan_response.scan_result:
+                scan_data = {
+                    "scan_type": "filesystem",
+                    "scanner": "trivy",
+                    "scan_started_at": datetime.now(),
+                    "scan_completed_at": datetime.now(),
+                    "passed": scan_response.success,
+                    "total_vulnerabilities": scan_response.scan_result.total_vulnerabilities,
+                    "critical_count": scan_response.scan_result.critical_count,
+                    "high_count": scan_response.scan_result.high_count,
+                    "medium_count": scan_response.scan_result.medium_count,
+                    "low_count": scan_response.scan_result.low_count,
+                    "vulnerabilities": scan_response.scan_result.vulnerabilities,
+                    "agent_decision": "pass" if scan_response.success else "fail",
+                    "agent_reasoning": scan_response.message
+                }
+                try:
+                    self.security_scan_repo.create(deployment_id, scan_data)
+                    logger.info("Security scan results stored", extra={"deployment_id": deployment_id})
+                except Exception as e:
+                    logger.warning("Failed to store security scan results", extra={"error": str(e)})
+
             # Extract results from response
             result = {
                 "passed": scan_response.success,
@@ -481,6 +612,24 @@ CMD ["python", "-m", "uvicorn", "temp_api.api:app", "--host", "0.0.0.0", "--port
             elif build_response.success:
                 # Default estimate if not available
                 image_size_mb = 150.0
+
+            # Store build results in database
+            if build_response.build_result:
+                build_data = {
+                    "build_started_at": datetime.now(),
+                    "build_completed_at": datetime.now(),
+                    "success": build_response.success,
+                    "dockerfile_path": "Dockerfile",
+                    "dockerfile_generated": True,
+                    "image_tag": build_response.image_tag,
+                    "image_size_bytes": int(image_size_mb * 1024 * 1024) if image_size_mb else None,
+                    "error_message": build_response.message if not build_response.success else None
+                }
+                try:
+                    self.build_result_repo.create(deployment_id, build_data)
+                    logger.info("Build results stored", extra={"deployment_id": deployment_id})
+                except Exception as e:
+                    logger.warning("Failed to store build results", extra={"error": str(e)})
 
             result = {
                 "success": build_response.success,
