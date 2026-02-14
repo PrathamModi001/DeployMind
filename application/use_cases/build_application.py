@@ -130,15 +130,14 @@ class BuildApplicationUseCase:
                 image_tag = f"deploymind-{project_info.language}-{timestamp}"
 
             build_result = self.docker_builder.build(
-                project_path=str(project_path),
+                context_path=str(project_path),
                 project_info=project_info,
                 dockerfile_content=dockerfile_content,
-                tag=image_tag,
-                stream_logs=False  # Disable streaming for cleaner logs
+                tag=image_tag
             )
 
             if not build_result.success:
-                raise RuntimeError(f"Docker build failed: {build_result.error}")
+                raise RuntimeError(f"Docker build failed: {build_result.error_message}")
 
             logger.info(
                 "Docker image built successfully",
