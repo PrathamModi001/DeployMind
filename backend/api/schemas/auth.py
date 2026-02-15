@@ -43,3 +43,17 @@ class TokenData(BaseModel):
     """Token payload data."""
     user_id: Optional[int] = None
     email: Optional[str] = None
+
+
+class GitHubOAuthRequest(BaseModel):
+    """GitHub OAuth callback request."""
+    code: str
+
+
+class GitHubUserData(BaseModel):
+    """GitHub user data from OAuth."""
+    id: int
+    login: str
+    email: Optional[str] = None
+    name: Optional[str] = None
+    avatar_url: Optional[str] = None

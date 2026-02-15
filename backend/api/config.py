@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     api_version: str = "1.0.0"
     api_description: str = "AI-Powered Deployment Platform API"
 
+    # GitHub OAuth (optional - for production)
+    github_client_id: str = "mock_client_id"
+    github_client_secret: str = "mock_client_secret"
+    github_redirect_uri: str = "http://localhost:3000/auth/callback"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

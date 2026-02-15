@@ -1,8 +1,9 @@
 """Authentication routes."""
 from fastapi import APIRouter, Depends, HTTPException, status
 from datetime import timedelta
+import httpx
 
-from ..schemas.auth import UserCreate, UserLogin, UserResponse, Token
+from ..schemas.auth import UserCreate, UserLogin, UserResponse, Token, GitHubOAuthRequest
 from ..utils.jwt import create_access_token, get_password_hash, verify_password
 from ..middleware.auth import get_current_active_user
 from ..config import settings
@@ -141,3 +142,88 @@ async def logout(current_user: dict = Depends(get_current_active_user)):
     Note: JWT tokens are stateless, so logout is handled client-side by removing the token.
     """
     return {"message": "Successfully logged out"}
+
+
+@router.get("/github")
+async def github_oauth_url():
+    """
+    Get GitHub OAuth authorization URL.
+
+    Returns the URL to redirect user to for GitHub OAuth.
+    """
+    # GitHub OAuth settings
+    client_id = settings.github_client_id if hasattr(settings, 'github_client_id') else "mock_client_id"
+    redirect_uri = settings.github_redirect_uri if hasattr(settings, 'github_redirect_uri') else "http://localhost:3000/auth/callback"
+
+    # Build OAuth URL
+    github_oauth_url = (
+        f"https://github.com/login/oauth/authorize"
+        f"?client_id={client_id}"
+        f"&redirect_uri={redirect_uri}"
+        f"&scope=user:email,read:user,repo"
+    )
+
+    return {
+        "url": github_oauth_url,
+        "client_id": client_id,
+    }
+
+
+@router.post("/github/callback")
+async def github_oauth_callback(request: GitHubOAuthRequest):
+    """
+    GitHub OAuth callback.
+
+    Exchanges authorization code for access token and creates user session.
+    """
+    try:
+        # For now, mock the GitHub OAuth flow
+        # In production with real GitHub App credentials, this would:
+        # 1. Exchange code for access_token with GitHub
+        # 2. Fetch user data from GitHub API
+        # 3. Create/update user in database
+        # 4. Return JWT token
+
+        # Mock successful GitHub user (simulating API response)
+        github_user_data = {
+            "id": 12345,
+            "login": "github_developer",
+            "email": "developer@github.com",
+            "name": "GitHub Developer",
+            "avatar_url": "https://avatars.githubusercontent.com/u/12345",
+        }
+
+        # Create or update user in mock database
+        user_id = len(get_mock_users()) + 1
+        mock_user = {
+            "id": user_id,
+            "email": github_user_data["email"] or f"{github_user_data['login']}@github.com",
+            "username": github_user_data["login"],
+            "full_name": github_user_data["name"] or github_user_data["login"],
+            "is_active": True,
+            "is_superuser": False,
+            "github_id": github_user_data["id"],
+            "avatar_url": github_user_data["avatar_url"],
+        }
+
+        # Add to mock users
+        get_mock_users()[mock_user["email"]] = mock_user
+
+        # Create JWT access token
+        access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
+        access_token = create_access_token(
+            data={
+                "user_id": mock_user["id"],
+                "email": mock_user["email"],
+                "username": mock_user["username"],
+            },
+            expires_delta=access_token_expires
+        )
+
+        return Token(access_token=access_token, token_type="bearer")
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"GitHub OAuth failed: {str(e)}"
+        )

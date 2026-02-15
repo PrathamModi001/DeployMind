@@ -3,90 +3,243 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { api } from '@/lib/api';
+import { Github, Rocket, Sparkles, Zap, Shield } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { toast } from 'sonner';
+import confetti from 'canvas-confetti';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+  const handleGitHubLogin = async () => {
     setLoading(true);
 
     try {
-      const response = await api.auth.login(email, password);
-      const { access_token } = response.data;
+      // Get GitHub OAuth URL from backend
+      const response = await fetch('http://localhost:8000/api/auth/github');
+      const data = await response.json();
 
-      // Store token
-      localStorage.setItem('token', access_token);
+      // For mock flow: simulate GitHub OAuth success after short delay
+      // In production with real GitHub App, would redirect to: data.url
+      setTimeout(async () => {
+        // Simulate OAuth callback with mock code
+        const callbackResponse = await fetch('http://localhost:8000/api/auth/github/callback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: 'mock_github_code_' + Date.now() }),
+        });
 
-      // Redirect to dashboard
-      router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Login failed. Please check your credentials.');
-    } finally {
+        if (callbackResponse.ok) {
+          const { access_token } = await callbackResponse.json();
+          localStorage.setItem('token', access_token);
+
+          // Trigger confetti celebration! 🎉
+          confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 },
+            colors: ['#9f7aea', '#60a5fa', '#4ade80', '#fbbf24']
+          });
+
+          // Show success toast
+          toast.success('Welcome to DeployMind! 🚀', {
+            description: 'Let\'s ship something amazing today',
+          });
+
+          // Redirect after a short delay to enjoy the confetti
+          setTimeout(() => {
+            router.push('/dashboard');
+          }, 800);
+        } else {
+          toast.error('Login failed', {
+            description: 'Could not authenticate with GitHub',
+          });
+          setLoading(false);
+        }
+      }, 1500);
+    } catch (error) {
+      console.error('GitHub OAuth error:', error);
+      toast.error('Login failed', {
+        description: 'Could not connect to authentication server',
+      });
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-semibold text-center">DeployMind</CardTitle>
-          <CardDescription className="text-center">
-            Sign in to your account to continue
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="admin@deploymind.io"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            {error && (
-              <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-lg border border-destructive/20">
-                {error}
-              </div>
+    <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
+      {/* Gradient orbs background (Stripe-style) */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <motion.div
+          className="absolute top-1/4 -left-48 w-96 h-96 rounded-full bg-primary/20 blur-3xl"
+          animate={{
+            scale: [1, 1.2, 1],
+            opacity: [0.3, 0.5, 0.3],
+          }}
+          transition={{
+            duration: 8,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        />
+        <motion.div
+          className="absolute bottom-1/4 -right-48 w-96 h-96 rounded-full bg-blue-500/20 blur-3xl"
+          animate={{
+            scale: [1.2, 1, 1.2],
+            opacity: [0.5, 0.3, 0.5],
+          }}
+          transition={{
+            duration: 10,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        />
+      </div>
+
+      {/* Login card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="relative z-10 w-full max-w-md px-4"
+      >
+        {/* Logo and branding */}
+        <div className="text-center mb-8">
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/50 mb-4 shadow-lg shadow-primary/20"
+          >
+            <Rocket className="w-8 h-8 text-white" />
+          </motion.div>
+
+          <motion.h1
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="text-3xl font-bold bg-gradient-to-r from-foreground via-foreground/90 to-foreground/70 bg-clip-text text-transparent mb-2"
+          >
+            Welcome to DeployMind
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="text-muted-foreground"
+          >
+            Deploy with confidence, powered by AI
+          </motion.p>
+        </div>
+
+        {/* Login card */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="bg-card border border-border/50 rounded-2xl p-8 backdrop-blur-sm"
+        >
+          {/* GitHub OAuth button (Railway/Vercel style) */}
+          <Button
+            onClick={handleGitHubLogin}
+            disabled={loading}
+            className="w-full h-12 text-base font-medium bg-foreground text-background hover:bg-foreground/90 shadow-lg hover-lift relative overflow-hidden group"
+          >
+            {loading ? (
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              >
+                <Sparkles className="w-5 h-5" />
+              </motion.div>
+            ) : (
+              <>
+                <Github className="w-5 h-5 mr-2" />
+                Continue with GitHub
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+                  initial={{ x: "-100%" }}
+                  animate={{ x: "100%" }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    repeatDelay: 1,
+                    ease: "linear"
+                  }}
+                />
+              </>
             )}
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={loading}
-            >
-              {loading ? 'Signing in...' : 'Sign In'}
-            </Button>
-            <div className="text-sm text-muted-foreground text-center mt-4">
-              Default credentials: admin@deploymind.io / admin123
+          </Button>
+
+          {/* Divider */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border/50"></div>
             </div>
-          </form>
-        </CardContent>
-      </Card>
+            <div className="relative flex justify-center text-xs">
+              <span className="bg-card px-3 text-muted-foreground">
+                One click to deploy
+              </span>
+            </div>
+          </div>
+
+          {/* Features list (Stripe-style) */}
+          <div className="space-y-3 text-sm">
+            <motion.div
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.6 }}
+              className="flex items-center gap-3 text-muted-foreground"
+            >
+              <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Zap className="w-3 h-3 text-primary" />
+              </div>
+              <span>Instant deployment from your GitHub repos</span>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.7 }}
+              className="flex items-center gap-3 text-muted-foreground"
+            >
+              <div className="w-5 h-5 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                <Shield className="w-3 h-3 text-blue-400" />
+              </div>
+              <span>AI-powered security scanning</span>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.8 }}
+              className="flex items-center gap-3 text-muted-foreground"
+            >
+              <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-3 h-3 text-green-400" />
+              </div>
+              <span>Automated rollbacks and health checks</span>
+            </motion.div>
+          </div>
+        </motion.div>
+
+        {/* Footer */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.9 }}
+          className="mt-8 text-center text-xs text-muted-foreground"
+        >
+          <p>
+            By continuing, you agree to our{' '}
+            <a href="#" className="text-foreground hover:underline">Terms of Service</a>
+            {' '}and{' '}
+            <a href="#" className="text-foreground hover:underline">Privacy Policy</a>
+          </p>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }

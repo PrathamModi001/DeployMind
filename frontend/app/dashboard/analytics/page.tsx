@@ -2,6 +2,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { AnimatedCard } from '@/components/ui/animated-card';
+import { AnimatedStat } from '@/components/ui/animated-stat';
 import { api } from '@/lib/api';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -67,17 +69,19 @@ export default function AnalyticsPage() {
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <AnimatedCard delay={0} hover={false}>
           <CardHeader className="pb-2">
             <CardDescription>Total Deployments</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-semibold">{overview?.total_deployments || 0}</div>
+            <div className="text-3xl font-semibold">
+              <AnimatedStat value={overview?.total_deployments || 0} />
+            </div>
             <p className="text-xs text-muted-foreground mt-1">Last 30 days</p>
           </CardContent>
-        </Card>
+        </AnimatedCard>
 
-        <Card>
+        <AnimatedCard delay={0.1} hover={false}>
           <CardHeader className="pb-2">
             <CardDescription>Success Rate</CardDescription>
           </CardHeader>
@@ -87,9 +91,9 @@ export default function AnalyticsPage() {
             </div>
             <p className="text-xs text-muted-foreground mt-1">Overall performance</p>
           </CardContent>
-        </Card>
+        </AnimatedCard>
 
-        <Card>
+        <AnimatedCard delay={0.2} hover={false}>
           <CardHeader className="pb-2">
             <CardDescription>Avg Duration</CardDescription>
           </CardHeader>
@@ -99,24 +103,24 @@ export default function AnalyticsPage() {
             </div>
             <p className="text-xs text-muted-foreground mt-1">Per deployment</p>
           </CardContent>
-        </Card>
+        </AnimatedCard>
 
-        <Card>
+        <AnimatedCard delay={0.3} hover={false}>
           <CardHeader className="pb-2">
             <CardDescription>Active Deployments</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-semibold">
-              {overview?.deployments_by_status?.DEPLOYED || 0}
+              <AnimatedStat value={overview?.deployments_by_status?.DEPLOYED || 0} />
             </div>
             <p className="text-xs text-muted-foreground mt-1">Currently running</p>
           </CardContent>
-        </Card>
+        </AnimatedCard>
       </div>
 
       {/* Charts Row 1 */}
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
+        <AnimatedCard delay={0.1} hover={false}>
           <CardHeader>
             <CardTitle>Deployment Timeline</CardTitle>
             <CardDescription>Deployments over the last 7 days</CardDescription>
@@ -153,9 +157,9 @@ export default function AnalyticsPage() {
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
-        </Card>
+        </AnimatedCard>
 
-        <Card>
+        <AnimatedCard delay={0.2} hover={false}>
           <CardHeader>
             <CardTitle>Deployments by Status</CardTitle>
             <CardDescription>Distribution of deployment outcomes</CardDescription>
@@ -188,12 +192,12 @@ export default function AnalyticsPage() {
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
-        </Card>
+        </AnimatedCard>
       </div>
 
       {/* Charts Row 2 */}
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
+        <AnimatedCard delay={0.3} hover={false}>
           <CardHeader>
             <CardTitle>Build Times by Language</CardTitle>
             <CardDescription>Average build duration per language</CardDescription>
@@ -230,9 +234,9 @@ export default function AnalyticsPage() {
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
-        </Card>
+        </AnimatedCard>
 
-        <Card>
+        <AnimatedCard delay={0.2} hover={false}>
           <CardHeader>
             <CardTitle>Deployments by Environment</CardTitle>
             <CardDescription>Environment distribution</CardDescription>
@@ -264,7 +268,7 @@ export default function AnalyticsPage() {
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
-        </Card>
+        </AnimatedCard>
       </div>
     </div>
   );

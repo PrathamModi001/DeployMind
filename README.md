@@ -6,6 +6,32 @@ Deploy applications to AWS with zero manual intervention using intelligent multi
 
 **100% FREE** - Uses Groq's free tier (1000 requests/day) | **Production Ready** | **Security First**
 
+> 📖 **New to DeployMind?** Check out [QUICKSTART.md](./QUICKSTART.md) for copy-paste commands to run the full-stack app!
+
+---
+
+## 🎨 New: Beautiful Web UI
+
+DeployMind now includes a **production-ready web interface** with:
+
+- ✅ **GitHub OAuth** login with confetti celebration 🎉
+- ✅ **Railway-style** colorful deployment cards
+- ✅ **Arc Browser-style** color-coded sidebar
+- ✅ **Real-time** deployment monitoring with live logs
+- ✅ **Stripe-style** pricing page
+- ✅ **Toast notifications** and smooth animations
+
+**Quick Start**:
+```bash
+# Terminal 1: Backend (FastAPI)
+cd backend && uvicorn api.main:app --reload --port 8000
+
+# Terminal 2: Frontend (Next.js)
+cd frontend && npm run dev
+```
+
+Then visit **http://localhost:3000** and login with GitHub!
+
 ## ✨ Features
 
 - 🤖 **Multi-Agent AI System** - 4 specialized agents (Orchestrator, Security, Build, Deploy)

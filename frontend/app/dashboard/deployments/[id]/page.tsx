@@ -2,27 +2,67 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { AnimatedCard } from '@/components/ui/animated-card';
 import { api } from '@/lib/api';
-import { ArrowLeft, CheckCircle2, Clock, Rocket, Shield, XCircle } from 'lucide-react';
+import {
+  ArrowLeft, GitBranch, Clock, Server, Terminal, Play, Square,
+  CheckCircle2, XCircle, Loader2, Activity, Shield, Rocket
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 
-const statusColors = {
-  PENDING: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
-  BUILDING: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-  DEPLOYING: 'bg-primary/10 text-primary border-primary/20',
-  DEPLOYED: 'bg-green-500/10 text-green-500 border-green-500/20',
-  FAILED: 'bg-destructive/10 text-destructive border-destructive/20',
-  ROLLED_BACK: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
+const statusConfig = {
+  DEPLOYED: {
+    color: 'text-green-400',
+    bg: 'bg-green-500/10',
+    border: 'border-green-500/20',
+    icon: CheckCircle2,
+    animate: ''
+  },
+  DEPLOYING: {
+    color: 'text-blue-400',
+    bg: 'bg-blue-500/10',
+    border: 'border-blue-500/20',
+    icon: Loader2,
+    animate: 'animate-spin'
+  },
+  BUILDING: {
+    color: 'text-purple-400',
+    bg: 'bg-purple-500/10',
+    border: 'border-purple-500/20',
+    icon: Loader2,
+    animate: 'animate-spin'
+  },
+  FAILED: {
+    color: 'text-red-400',
+    bg: 'bg-red-500/10',
+    border: 'border-red-500/20',
+    icon: XCircle,
+    animate: ''
+  },
+  PENDING: {
+    color: 'text-yellow-400',
+    bg: 'bg-yellow-500/10',
+    border: 'border-yellow-500/20',
+    icon: Clock,
+    animate: ''
+  },
+  ROLLED_BACK: {
+    color: 'text-orange-400',
+    bg: 'bg-orange-500/10',
+    border: 'border-orange-500/20',
+    icon: XCircle,
+    animate: ''
+  },
 };
 
 const phases = [
-  { id: 'security', label: 'Security Scan', icon: Shield },
-  { id: 'build', label: 'Build', icon: Rocket },
-  { id: 'deploy', label: 'Deploy', icon: CheckCircle2 },
+  { id: 'security', label: 'Security Scan', icon: Shield, description: 'Scanning for vulnerabilities' },
+  { id: 'build', label: 'Build', icon: Rocket, description: 'Building Docker image' },
+  { id: 'deploy', label: 'Deploy', icon: CheckCircle2, description: 'Deploying to EC2' },
 ];
 
 export default function DeploymentDetailPage() {
@@ -37,10 +77,9 @@ export default function DeploymentDetailPage() {
       const response = await api.deployments.get(params.id as string);
       return response.data;
     },
-    refetchInterval: 5000, // Refresh every 5 seconds
+    refetchInterval: 5000,
   });
 
-  // Fetch logs
   const { data: logsData } = useQuery({
     queryKey: ['deployment-logs', params.id],
     queryFn: async () => {
@@ -75,146 +114,221 @@ export default function DeploymentDetailPage() {
     );
   }
 
+  const status = statusConfig[deployment.status as keyof typeof statusConfig] || statusConfig.PENDING;
+  const StatusIcon = status.icon;
   const currentPhase = deployment.status === 'BUILDING' ? 1 : deployment.status === 'DEPLOYING' ? 2 : deployment.status === 'DEPLOYED' ? 3 : 0;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => router.push('/dashboard/deployments')}>
-          <ArrowLeft className="h-5 w-5" />
+      {/* Breadcrumb header - Vercel style */}
+      <div className="flex items-center gap-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="hover:bg-white/5"
+          onClick={() => router.push('/dashboard/deployments')}
+        >
+          <ArrowLeft className="w-5 h-5" />
         </Button>
-        <div>
-          <h2 className="text-3xl font-semibold tracking-tight">Deployment Details</h2>
-          <p className="text-muted-foreground mt-1">
-            {deployment.repository} • {deployment.id?.substring(0, 8)}
-          </p>
+
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span className="hover:text-foreground transition-colors cursor-pointer"
+            onClick={() => router.push('/dashboard/deployments')}>
+            Deployments
+          </span>
+          <span>/</span>
+          <span className="text-foreground font-medium font-mono">
+            {deployment.id?.substring(0, 8)}
+          </span>
         </div>
       </div>
 
-      {/* Status Overview */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Status Overview</CardTitle>
-              <CardDescription>Current deployment status and progress</CardDescription>
-            </div>
-            <Badge
-              variant="outline"
-              className={statusColors[deployment.status as keyof typeof statusColors] || statusColors.PENDING}
-            >
-              {deployment.status}
-            </Badge>
+      {/* Repository header - Vercel style */}
+      <div className="flex items-start justify-between">
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <GitBranch className="w-5 h-5 text-muted-foreground" />
+            <h2 className="text-2xl font-semibold font-mono">
+              {deployment.repository}
+            </h2>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Instance ID</p>
-              <p className="font-mono text-sm">{deployment.instance_id || 'N/A'}</p>
+
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <Server className="w-4 h-4" />
+              <span className="font-mono">{deployment.instance_id || 'N/A'}</span>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Strategy</p>
-              <p className="capitalize">{deployment.strategy || 'rolling'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground mb-1">Duration</p>
-              <p>
-                {deployment.duration_seconds
-                  ? `${Math.floor(deployment.duration_seconds / 60)}m ${deployment.duration_seconds % 60}s`
-                  : 'In progress...'}
-              </p>
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-4 h-4" />
+              <span>
+                {deployment.created_at
+                  ? new Date(deployment.created_at).toLocaleString()
+                  : 'Just now'}
+              </span>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Deployment Timeline */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Deployment Pipeline</CardTitle>
-          <CardDescription>Sequential deployment phases</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            {phases.map((phase, index) => {
-              const Icon = phase.icon;
-              const isCompleted = index < currentPhase;
-              const isActive = index === currentPhase;
-              const isPending = index > currentPhase;
+        {/* Status badge - large */}
+        <Badge
+          variant="outline"
+          className={`
+            ${status.bg}
+            ${status.border}
+            ${status.color}
+            px-4 py-2 text-sm flex items-center gap-2
+          `}
+        >
+          <StatusIcon className={`w-4 h-4 ${status.animate}`} />
+          {deployment.status}
+        </Badge>
+      </div>
 
-              return (
-                <div key={phase.id} className="flex items-center flex-1">
-                  <div className="flex flex-col items-center">
-                    <div
-                      className={`
-                        w-12 h-12 rounded-full flex items-center justify-center border-2 transition-colors
-                        ${isCompleted ? 'bg-primary/10 border-primary text-primary' : ''}
-                        ${isActive ? 'bg-primary/20 border-primary text-primary animate-pulse' : ''}
-                        ${isPending ? 'bg-muted border-border text-muted-foreground' : ''}
-                      `}
-                    >
-                      <Icon className="h-5 w-5" />
+      {/* Terminal logs - Vercel style */}
+      <AnimatedCard className="relative overflow-hidden" delay={0.1}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-black/20">
+          <div className="flex items-center gap-2">
+            <Terminal className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Deployment Logs</span>
+            {(deployment.status === 'DEPLOYING' || deployment.status === 'BUILDING') && (
+              <Badge variant="outline" className="text-xs bg-blue-500/10 border-blue-500/20 text-blue-400">
+                <Activity className="w-3 h-3 mr-1 animate-pulse" />
+                Live
+              </Badge>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5">
+              <Play className="w-3 h-3" />
+              Resume
+            </Button>
+            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5">
+              <Square className="w-3 h-3" />
+              Pause
+            </Button>
+          </div>
+        </div>
+
+        <div className="bg-[#0a0a0f] p-4 font-mono text-xs leading-relaxed">
+          <ScrollArea className="h-96">
+            {logs.length === 0 ? (
+              <p className="text-muted-foreground">No logs available yet...</p>
+            ) : (
+              logs.map((log, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.02 }}
+                  className="flex gap-3 mb-1 hover:bg-white/5 px-2 py-0.5 rounded transition-colors"
+                >
+                  <span className="text-muted-foreground select-none min-w-[80px]">
+                    {new Date().toLocaleTimeString()}
+                  </span>
+                  <span className="text-foreground/90">{log}</span>
+                </motion.div>
+              ))
+            )}
+            <div ref={logsEndRef} />
+
+            {/* Animated cursor */}
+            {(deployment.status === 'DEPLOYING' || deployment.status === 'BUILDING') && (
+              <motion.span
+                animate={{ opacity: [1, 0, 1] }}
+                transition={{ duration: 1, repeat: Infinity }}
+                className="inline-block w-2 h-4 bg-primary/60 ml-2"
+              />
+            )}
+          </ScrollArea>
+        </div>
+      </AnimatedCard>
+
+      {/* Deployment pipeline - Visual (Railway + Linear style) */}
+      <AnimatedCard delay={0.2}>
+        <div className="p-6">
+          <h3 className="text-lg font-semibold mb-6">Deployment Pipeline</h3>
+
+          <div className="relative">
+            {/* Progress line */}
+            <div className="absolute left-6 top-6 bottom-6 w-0.5 bg-border" />
+            <motion.div
+              className="absolute left-6 top-6 w-0.5 bg-gradient-to-b from-primary to-primary/50"
+              initial={{ height: 0 }}
+              animate={{ height: `${(currentPhase / phases.length) * 100}%` }}
+              transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+            />
+
+            {/* Phases */}
+            <div className="space-y-6">
+              {phases.map((phase, index) => {
+                const Icon = phase.icon;
+                const isCompleted = index < currentPhase;
+                const isActive = index === currentPhase;
+
+                return (
+                  <motion.div
+                    key={phase.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="flex items-start gap-4 relative"
+                  >
+                    {/* Icon */}
+                    <div className={`
+                      relative z-10 w-12 h-12 rounded-full flex items-center justify-center
+                      transition-all duration-300
+                      ${isCompleted
+                        ? 'bg-primary/20 border-2 border-primary'
+                        : isActive
+                          ? 'bg-primary/10 border-2 border-primary/50 animate-pulse'
+                          : 'bg-muted border-2 border-border'
+                      }
+                    `}>
+                      <Icon className={`
+                        w-5 h-5 transition-colors
+                        ${isCompleted
+                          ? 'text-primary'
+                          : isActive
+                            ? 'text-primary/70'
+                            : 'text-muted-foreground'
+                        }
+                      `} />
                     </div>
-                    <p className="text-sm mt-2 font-medium">{phase.label}</p>
-                    {isCompleted && <CheckCircle2 className="h-4 w-4 text-primary mt-1" />}
-                    {isActive && <Clock className="h-4 w-4 text-primary mt-1 animate-spin" />}
-                  </div>
-                  {index < phases.length - 1 && (
-                    <div
-                      className={`flex-1 h-0.5 mx-4 ${
-                        isCompleted ? 'bg-primary' : 'bg-border'
-                      }`}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Live Logs */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Deployment Logs</CardTitle>
-          <CardDescription>Real-time deployment output</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="bg-[#0D0D0D] border border-border rounded-lg p-4 font-mono text-sm">
-            <ScrollArea className="h-96">
-              <div className="space-y-1">
-                {logs.length === 0 ? (
-                  <p className="text-muted-foreground">No logs available yet...</p>
-                ) : (
-                  logs.map((log, i) => (
-                    <div key={i} className="leading-relaxed">
-                      <span className="text-muted-foreground mr-3">
-                        {new Date().toLocaleTimeString()}
-                      </span>
-                      <span className="text-foreground/80">{log}</span>
+                    {/* Content */}
+                    <div className="flex-1 pt-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <h4 className="font-semibold">{phase.label}</h4>
+                        {isCompleted && (
+                          <CheckCircle2 className="w-4 h-4 text-primary" />
+                        )}
+                        {isActive && (
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                          >
+                            <Activity className="w-4 h-4 text-primary" />
+                          </motion.div>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {phase.description}
+                      </p>
                     </div>
-                  ))
-                )}
-                <div ref={logsEndRef} />
-              </div>
-              {/* Cursor indicator */}
-              {deployment.status === 'DEPLOYING' || deployment.status === 'BUILDING' ? (
-                <span className="inline-block w-2 h-4 bg-primary/50 animate-pulse ml-1" />
-              ) : null}
-            </ScrollArea>
+                  </motion.div>
+                );
+              })}
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </AnimatedCard>
 
       {/* Actions */}
       {deployment.status === 'DEPLOYED' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Actions</CardTitle>
-            <CardDescription>Manage this deployment</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <AnimatedCard delay={0.3}>
+          <div className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Actions</h3>
             <div className="flex gap-3">
               <Button variant="outline" className="gap-2">
                 <XCircle className="h-4 w-4" />
@@ -224,8 +338,8 @@ export default function DeploymentDetailPage() {
                 View Health Checks
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </AnimatedCard>
       )}
     </div>
   );
