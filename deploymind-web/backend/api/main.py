@@ -1,10 +1,15 @@
 """DeployMind Backend API - Main Application."""
-from fastapi import FastAPI
+import logging
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+import time
 
 from .config import settings
 from .routes import auth, deployments, analytics
+
+# Set up logger
+logger = logging.getLogger("uvicorn.error")
 
 # Create FastAPI app
 app = FastAPI(
@@ -37,6 +42,35 @@ app.add_middleware(
 )
 
 print("CORS: Allowing localhost ports: 3000, 3001, 3002, 5000")
+
+
+# Add request logging middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log all incoming requests."""
+    start_time = time.time()
+
+    # Log incoming request
+    logger.info("=" * 80)
+    logger.info(f"[REQUEST] {request.method} {request.url.path}")
+    logger.info(f"[REQUEST] Full URL: {request.url}")
+    logger.info(f"[REQUEST] Client: {request.client.host if request.client else 'unknown'}")
+
+    # Process request
+    try:
+        response = await call_next(request)
+        process_time = time.time() - start_time
+        logger.info(f"[RESPONSE] Status: {response.status_code}")
+        logger.info(f"[RESPONSE] Time: {process_time:.3f}s")
+        logger.info("=" * 80)
+        return response
+    except Exception as e:
+        logger.error(f"[ERROR] Request failed: {str(e)}")
+        logger.error(f"[ERROR] Exception type: {type(e).__name__}")
+        import traceback
+        logger.error(f"[ERROR] Traceback:\n{traceback.format_exc()}")
+        logger.info("=" * 80)
+        raise
 
 # Include routers
 app.include_router(auth.router)

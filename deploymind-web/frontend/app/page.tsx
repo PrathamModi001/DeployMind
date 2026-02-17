@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Github, Rocket, Zap, Shield, Terminal, Activity, ArrowRight, Sparkles } from 'lucide-react';
+import { Logo } from '@/components/ui/logo';
+import { GridBackground } from '@/components/ui/grid-background';
+import { Github, Zap, Shield, Terminal, Activity, ArrowRight, Sparkles, Code, Lock, Gauge } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function Home() {
@@ -12,7 +14,6 @@ export default function Home() {
 
   useEffect(() => {
     setMounted(true);
-    // Check if user is logged in
     const token = localStorage.getItem('token');
     if (token) {
       router.push('/dashboard');
@@ -21,90 +22,59 @@ export default function Home() {
 
   if (!mounted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-muted-foreground">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-black">
+        <div className="text-gray-500">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Animated gradient orbs (Stripe-style) */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          className="absolute top-0 left-1/4 w-[500px] h-[500px] rounded-full bg-primary/10 blur-3xl"
-          animate={{
-            scale: [1, 1.3, 1],
-            opacity: [0.3, 0.5, 0.3],
-          }}
-          transition={{
-            duration: 10,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-        <motion.div
-          className="absolute bottom-0 right-1/4 w-[500px] h-[500px] rounded-full bg-blue-500/10 blur-3xl"
-          animate={{
-            scale: [1.3, 1, 1.3],
-            opacity: [0.5, 0.3, 0.5],
-          }}
-          transition={{
-            duration: 12,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-      </div>
+    <div className="min-h-screen bg-black text-white relative overflow-hidden">
+      {/* Railway-style animated background */}
+      <GridBackground />
+
+      {/* Header */}
+      <header className="relative z-10 border-b border-white/10 backdrop-blur-xl">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <Logo size="md" showText />
+
+          <Button
+            onClick={() => router.push('/login')}
+            variant="ghost"
+            className="gap-2 text-gray-300 hover:text-white hover:bg-white/5"
+          >
+            <Github className="w-4 h-4" />
+            Sign in
+          </Button>
+        </div>
+      </header>
 
       {/* Hero Section */}
       <div className="relative z-10">
-        {/* Header */}
-        <header className="border-b border-border/50 backdrop-blur-sm">
-          <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/50 flex items-center justify-center">
-                <Rocket className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-lg font-semibold">DeployMind</span>
-            </div>
-
-            <Button
-              onClick={() => router.push('/login')}
-              variant="ghost"
-              className="gap-2"
-            >
-              <Github className="w-4 h-4" />
-              Sign in with GitHub
-            </Button>
-          </div>
-        </header>
-
-        {/* Hero Content */}
-        <div className="container mx-auto px-4 py-24 md:py-32">
-          <div className="max-w-4xl mx-auto text-center">
+        <div className="container mx-auto px-4 py-20 md:py-32">
+          <div className="max-w-5xl mx-auto">
             {/* Badge */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-sm text-primary mb-8"
+              transition={{ duration: 0.6 }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20 text-sm text-purple-300 mb-8 backdrop-blur-sm"
             >
               <Sparkles className="w-4 h-4" />
-              AI-Powered Deployment Platform
+              Powered by AI Agents
             </motion.div>
 
             {/* Headline */}
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-foreground via-foreground/90 to-foreground/70 bg-clip-text text-transparent"
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="text-5xl md:text-7xl lg:text-8xl font-bold mb-6 leading-tight"
             >
-              Ship faster with
+              Deploy with
               <br />
-              <span className="bg-gradient-to-r from-primary via-blue-400 to-primary bg-clip-text text-transparent">
-                AI-powered deployments
+              <span className="bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                confidence
               </span>
             </motion.h1>
 
@@ -112,101 +82,185 @@ export default function Home() {
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="text-xl text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed"
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="text-xl md:text-2xl text-gray-400 mb-12 max-w-3xl leading-relaxed"
             >
-              Automated security scanning, intelligent builds, and zero-downtime deployments.
-              Connect your GitHub repo and deploy in seconds.
+              AI-powered security scanning, intelligent builds, and zero-downtime deployments.
+              Ship production-grade applications in seconds.
             </motion.p>
 
             {/* CTA Buttons */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-              className="flex flex-col sm:flex-row items-center justify-center gap-4"
+              transition={{ duration: 0.6, delay: 0.3 }}
+              className="flex flex-col sm:flex-row items-start gap-4"
             >
               <Button
                 onClick={() => router.push('/login')}
                 size="lg"
-                className="w-full sm:w-auto h-12 px-8 text-base bg-foreground text-background hover:bg-foreground/90 shadow-lg hover-lift gap-2"
+                className="h-14 px-8 text-base bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all gap-2 group"
               >
                 <Github className="w-5 h-5" />
                 Start Deploying
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Button>
 
               <Button
                 variant="outline"
                 size="lg"
-                className="w-full sm:w-auto h-12 px-8 text-base hover-lift"
+                className="h-14 px-8 text-base border-white/10 hover:border-white/20 hover:bg-white/5 text-white transition-all"
                 onClick={() => {
-                  // Scroll to features
                   document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
                 }}
               >
                 See how it works
               </Button>
             </motion.div>
+
+            {/* Stats */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="mt-16 grid grid-cols-3 gap-8 max-w-2xl"
+            >
+              <div>
+                <div className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">99.9%</div>
+                <div className="text-sm text-gray-500">Uptime</div>
+              </div>
+              <div>
+                <div className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">&lt;30s</div>
+                <div className="text-sm text-gray-500">Deploy Time</div>
+              </div>
+              <div>
+                <div className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">0</div>
+                <div className="text-sm text-gray-500">Downtime</div>
+              </div>
+            </motion.div>
           </div>
         </div>
 
         {/* Features Section */}
         <div id="features" className="container mx-auto px-4 py-24">
-          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {/* Feature 1 */}
+          <div className="max-w-6xl mx-auto">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.5 }}
-              className="group p-8 rounded-2xl bg-card border border-border/50 hover:border-border transition-all hover-lift"
+              transition={{ duration: 0.6 }}
+              className="text-center mb-16"
             >
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <Shield className="w-6 h-6 text-primary" />
-              </div>
-              <h3 className="text-xl font-semibold mb-3">AI Security Scanning</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Automated vulnerability detection powered by Trivy and AI agents.
-                Catch issues before they reach production.
-              </p>
+              <h2 className="text-4xl md:text-5xl font-bold mb-4">
+                Everything you need to
+                <span className="bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent"> ship faster</span>
+              </h2>
+              <p className="text-xl text-gray-400">Automated security, intelligent builds, zero-downtime deploys</p>
             </motion.div>
 
-            {/* Feature 2 */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              className="group p-8 rounded-2xl bg-card border border-border/50 hover:border-border transition-all hover-lift"
-            >
-              <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <Zap className="w-6 h-6 text-blue-400" />
-              </div>
-              <h3 className="text-xl font-semibold mb-3">Intelligent Builds</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Smart Dockerfile detection and optimization. Auto-detects languages
-                and builds optimized containers.
-              </p>
-            </motion.div>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Feature 1 */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5 }}
+                className="group p-8 rounded-2xl bg-gradient-to-br from-white/5 to-white/0 border border-white/10 hover:border-purple-500/50 transition-all backdrop-blur-sm"
+              >
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <Shield className="w-6 h-6 text-purple-400" />
+                </div>
+                <h3 className="text-xl font-semibold mb-3">AI Security Scanning</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  Automated vulnerability detection with Trivy and AI agents. Catch critical issues before production.
+                </p>
+              </motion.div>
 
-            {/* Feature 3 */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="group p-8 rounded-2xl bg-card border border-border/50 hover:border-border transition-all hover-lift"
-            >
-              <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <Activity className="w-6 h-6 text-green-400" />
-              </div>
-              <h3 className="text-xl font-semibold mb-3">Zero-Downtime Deploys</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                Rolling deployments with health checks. Automatic rollbacks
-                if issues are detected.
-              </p>
-            </motion.div>
+              {/* Feature 2 */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+                className="group p-8 rounded-2xl bg-gradient-to-br from-white/5 to-white/0 border border-white/10 hover:border-blue-500/50 transition-all backdrop-blur-sm"
+              >
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <Code className="w-6 h-6 text-blue-400" />
+                </div>
+                <h3 className="text-xl font-semibold mb-3">Intelligent Builds</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  Auto-detect languages, generate optimized Dockerfiles, and build multi-stage containers.
+                </p>
+              </motion.div>
+
+              {/* Feature 3 */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                className="group p-8 rounded-2xl bg-gradient-to-br from-white/5 to-white/0 border border-white/10 hover:border-cyan-500/50 transition-all backdrop-blur-sm"
+              >
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <Gauge className="w-6 h-6 text-cyan-400" />
+                </div>
+                <h3 className="text-xl font-semibold mb-3">Zero-Downtime Deploys</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  Rolling deployments with health checks. Instant rollback if issues are detected.
+                </p>
+              </motion.div>
+
+              {/* Feature 4 */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+                className="group p-8 rounded-2xl bg-gradient-to-br from-white/5 to-white/0 border border-white/10 hover:border-purple-500/50 transition-all backdrop-blur-sm"
+              >
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <Lock className="w-6 h-6 text-purple-400" />
+                </div>
+                <h3 className="text-xl font-semibold mb-3">GitHub Integration</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  Connect repos with OAuth. Auto-deploy on push. Monitor builds in real-time.
+                </p>
+              </motion.div>
+
+              {/* Feature 5 */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+                className="group p-8 rounded-2xl bg-gradient-to-br from-white/5 to-white/0 border border-white/10 hover:border-blue-500/50 transition-all backdrop-blur-sm"
+              >
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <Activity className="w-6 h-6 text-blue-400" />
+                </div>
+                <h3 className="text-xl font-semibold mb-3">Real-time Monitoring</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  Live deployment logs. Performance metrics. Instant alerts on failures.
+                </p>
+              </motion.div>
+
+              {/* Feature 6 */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: 0.5 }}
+                className="group p-8 rounded-2xl bg-gradient-to-br from-white/5 to-white/0 border border-white/10 hover:border-cyan-500/50 transition-all backdrop-blur-sm"
+              >
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <Zap className="w-6 h-6 text-cyan-400" />
+                </div>
+                <h3 className="text-xl font-semibold mb-3">Lightning Fast</h3>
+                <p className="text-gray-400 leading-relaxed">
+                  Optimized build pipelines. Edge caching. Deploy in under 30 seconds.
+                </p>
+              </motion.div>
+            </div>
           </div>
         </div>
 
@@ -216,42 +270,42 @@ export default function Home() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="max-w-4xl mx-auto text-center bg-gradient-to-br from-primary/10 via-blue-500/5 to-transparent border border-primary/20 rounded-3xl p-12"
+            className="max-w-4xl mx-auto text-center bg-gradient-to-br from-purple-500/10 via-blue-500/10 to-cyan-500/10 border border-purple-500/20 rounded-3xl p-12 md:p-16 backdrop-blur-sm"
           >
-            <Terminal className="w-12 h-12 text-primary mx-auto mb-6" />
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Ready to deploy smarter?
+            <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg shadow-purple-500/50">
+              <Terminal className="w-8 h-8 text-white" />
+            </div>
+            <h2 className="text-3xl md:text-5xl font-bold mb-4">
+              Ready to ship faster?
             </h2>
-            <p className="text-lg text-muted-foreground mb-8">
-              Join developers shipping production-grade applications faster with AI
+            <p className="text-lg md:text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
+              Join developers deploying production-grade applications with confidence
             </p>
             <Button
               onClick={() => router.push('/login')}
               size="lg"
-              className="h-12 px-8 text-base bg-foreground text-background hover:bg-foreground/90 shadow-lg hover-lift gap-2"
+              className="h-14 px-8 text-base bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all gap-2 group"
             >
               <Github className="w-5 h-5" />
               Get Started Free
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Button>
           </motion.div>
         </div>
 
         {/* Footer */}
-        <footer className="border-t border-border/50 backdrop-blur-sm mt-24">
-          <div className="container mx-auto px-4 py-8">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-primary to-primary/50 flex items-center justify-center">
-                  <Rocket className="w-4 h-4 text-white" />
-                </div>
-                <span>© 2026 DeployMind. All rights reserved.</span>
+        <footer className="relative z-10 border-t border-white/10 backdrop-blur-xl mt-24">
+          <div className="container mx-auto px-4 py-12">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="flex items-center gap-4">
+                <Logo size="sm" showText />
+                <span className="text-sm text-gray-500">© 2026 DeployMind</span>
               </div>
-              <div className="flex items-center gap-6">
-                <a href="#" className="hover:text-foreground transition-colors">Terms</a>
-                <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
-                <a href="#" className="hover:text-foreground transition-colors">Docs</a>
-                <a href="#" className="hover:text-foreground transition-colors">GitHub</a>
+              <div className="flex items-center gap-8 text-sm text-gray-500">
+                <a href="#" className="hover:text-white transition-colors">Docs</a>
+                <a href="#" className="hover:text-white transition-colors">GitHub</a>
+                <a href="#" className="hover:text-white transition-colors">Privacy</a>
+                <a href="#" className="hover:text-white transition-colors">Terms</a>
               </div>
             </div>
           </div>

@@ -36,4 +36,4 @@ def get_db():
 def init_db():
     """Initialize database tables."""
     Base.metadata.create_all(bind=engine)
-    print("✓ Backend database tables created")
+    print("Backend database tables created")

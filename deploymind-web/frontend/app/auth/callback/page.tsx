@@ -14,11 +14,19 @@ function AuthCallbackContent() {
 
   useEffect(() => {
     const handleCallback = async () => {
+      console.log('[FRONTEND CALLBACK] Page loaded');
+      console.log('[FRONTEND CALLBACK] Current URL:', window.location.href);
+      console.log('[FRONTEND CALLBACK] Search params:', window.location.search);
+
       const code = searchParams.get('code');
       const errorParam = searchParams.get('error');
 
+      console.log('[FRONTEND CALLBACK] Code:', code ? `${code.substring(0, 20)}...` : 'NULL');
+      console.log('[FRONTEND CALLBACK] Error param:', errorParam);
+
       // Check if user denied access
       if (errorParam) {
+        console.log('[FRONTEND CALLBACK] User denied authorization');
         setError('GitHub authorization was denied');
         toast.error('Login cancelled', {
           description: 'You cancelled the GitHub authorization',
@@ -29,6 +37,7 @@ function AuthCallbackContent() {
 
       // Check if we have the authorization code
       if (!code) {
+        console.log('[FRONTEND CALLBACK] ERROR: No code received from GitHub');
         setError('No authorization code received');
         toast.error('Login failed', {
           description: 'No authorization code from GitHub',
@@ -40,20 +49,28 @@ function AuthCallbackContent() {
       try {
         // Exchange code for JWT token
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        console.log('[FRONTEND CALLBACK] Sending code to backend:', apiUrl);
+        console.log('[FRONTEND CALLBACK] Code length:', code.length);
+
         const response = await fetch(`${apiUrl}/api/auth/github/callback`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code }),
         });
 
+        console.log('[FRONTEND CALLBACK] Backend response status:', response.status);
+
         if (!response.ok) {
           const errorData = await response.json();
+          console.log('[FRONTEND CALLBACK] Backend error:', errorData);
           throw new Error(errorData.detail || 'Authentication failed');
         }
 
         const { access_token } = await response.json();
+        console.log('[FRONTEND CALLBACK] Received access token (length):', access_token?.length);
 
         // Store JWT token
+        console.log('[FRONTEND CALLBACK] Storing token in localStorage');
         localStorage.setItem('token', access_token);
 
         // Trigger confetti celebration! 🎉
@@ -69,13 +86,15 @@ function AuthCallbackContent() {
           description: 'Let\'s ship something amazing today',
         });
 
+        console.log('[FRONTEND CALLBACK] SUCCESS! Redirecting to dashboard...');
         // Redirect to dashboard
         setTimeout(() => {
           router.push('/dashboard');
         }, 800);
       } catch (error) {
-        console.error('GitHub OAuth callback error:', error);
+        console.error('[FRONTEND CALLBACK] ERROR:', error);
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.log('[FRONTEND CALLBACK] Error message:', errorMessage);
         setError(errorMessage);
         toast.error('Login failed', {
           description: errorMessage,
