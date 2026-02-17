@@ -46,11 +46,14 @@ logs/
 *.db
 *.sqlite3
 
-# Trivy cache
+# Trivy cache and binaries
 .trivy-cache/
 bin/trivy.exe
 bin/trivy
 bin/*.exe
+tools/trivy.exe
+tools/trivy
+tools/*.exe
 
 # Temporary files
 *.tpl
