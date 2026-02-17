@@ -1,32 +1,48 @@
-"""User database model."""
-from sqlalchemy import Column, Integer, String, DateTime, Boolean
-from sqlalchemy.sql import func
-from datetime import datetime
-
-# Import from backend database module
+"""User database model for web authentication."""
 import sys
 from pathlib import Path
+from sqlalchemy import Column, Integer, String, DateTime, Boolean
+from sqlalchemy.sql import func
 
-# Add backend directory to path
-backend_dir = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(backend_dir))
+# Import Base from deploymind-core to share metadata
+core_path = Path(__file__).parent.parent.parent.parent / "deploymind-core"
+sys.path.insert(0, str(core_path))
 
-from database.connection import Base
+try:
+    from deploymind.infrastructure.database.connection import Base
+except ImportError:
+    # Fallback if core not available
+    from sqlalchemy.ext.declarative import declarative_base
+    Base = declarative_base()
 
 
 class User(Base):
-    """User model for authentication."""
+    """
+    User model for authentication and authorization.
 
-    __tablename__ = "users"
+    GitHub OAuth only - no password authentication.
+    """
+
+    __tablename__ = "web_users"
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     username = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=True)  # Nullable for OAuth users
     full_name = Column(String, nullable=True)
-    is_active = Column(Boolean, default=True)
-    is_superuser = Column(Boolean, default=False)
-    github_id = Column(String, nullable=True)  # GitHub user ID
-    avatar_url = Column(String, nullable=True)  # Profile picture
+
+    # OAuth fields (GitHub only)
+    github_id = Column(String, unique=True, nullable=False, index=True)
+    avatar_url = Column(String, nullable=True)
+
+    # Status fields
+    is_active = Column(Boolean, default=True, nullable=False)
+    is_superuser = Column(Boolean, default=False, nullable=False)
+
+    # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    def __repr__(self):
+        return f"<User(id={self.id}, email={self.email}, username={self.username})>"

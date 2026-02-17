@@ -1,7 +1,9 @@
 """Deployment routes."""
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
 from typing import Optional
 from datetime import datetime
+from sqlalchemy.orm import Session
+import uuid
 
 from ..schemas.deployment import (
     DeploymentCreate,
@@ -10,27 +12,11 @@ from ..schemas.deployment import (
     DeploymentStatus,
 )
 from ..middleware.auth import get_current_active_user
+from ..services.database import get_db
+from ..repositories.deployment_repo import DeploymentRepository
+from ..services.deployment_service import DeploymentService
 
 router = APIRouter(prefix="/api/deployments", tags=["Deployments"])
-
-
-# Mock deployments database (replace with real database later)
-MOCK_DEPLOYMENTS = [
-    {
-        "id": "a8083a12",
-        "repository": "PrathamModi001/DeployMind",
-        "instance_id": "i-0183af174a8023c1e",
-        "commit_sha": "fbc3f7d4",
-        "status": DeploymentStatus.DEPLOYED,
-        "image_tag": "prathammodi001-deploymind:fbc3f7d4",
-        "port": 8080,
-        "strategy": "rolling",
-        "environment": "production",
-        "created_at": "2026-02-14T13:52:11",
-        "updated_at": "2026-02-14T14:00:13",
-        "duration_seconds": 477.0,
-    }
-]
 
 
 @router.get("", response_model=DeploymentListResponse)
@@ -39,28 +25,36 @@ async def list_deployments(
     page_size: int = Query(10, ge=1, le=100, description="Items per page"),
     status: Optional[DeploymentStatus] = Query(None, description="Filter by status"),
     current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
 ):
     """
     List all deployments with pagination.
 
     Supports filtering by status and pagination.
     """
-    # Filter by status if provided
-    deployments = MOCK_DEPLOYMENTS
-    if status:
-        deployments = [d for d in deployments if d["status"] == status]
+    repo = DeploymentRepository(db)
 
-    # Pagination
-    total = len(deployments)
-    start = (page - 1) * page_size
-    end = start + page_size
-    paginated_deployments = deployments[start:end]
+    # Calculate offset from page number
+    offset = (page - 1) * page_size
+
+    # Get deployments from database
+    status_filter = status.value if status else None
+    deployments, total = repo.list_deployments(
+        offset=offset,
+        limit=page_size,
+        status=status_filter,
+    )
+
+    # Convert to response format
+    deployment_responses = [
+        _deployment_to_response(d) for d in deployments
+    ]
 
     return DeploymentListResponse(
         total=total,
         page=page,
         page_size=page_size,
-        deployments=paginated_deployments,
+        deployments=deployment_responses,
     )
 
 
@@ -68,14 +62,15 @@ async def list_deployments(
 async def get_deployment(
     deployment_id: str,
     current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
 ):
     """
     Get deployment details by ID.
 
     Returns full deployment information including status, logs, and metadata.
     """
-    # Find deployment
-    deployment = next((d for d in MOCK_DEPLOYMENTS if d["id"] == deployment_id), None)
+    repo = DeploymentRepository(db)
+    deployment = repo.get_by_id(deployment_id)
 
     if not deployment:
         raise HTTPException(
@@ -83,80 +78,90 @@ async def get_deployment(
             detail=f"Deployment {deployment_id} not found"
         )
 
-    return deployment
+    return _deployment_to_response(deployment)
 
 
 @router.post("", response_model=DeploymentResponse, status_code=status.HTTP_201_CREATED)
 async def create_deployment(
     deployment: DeploymentCreate,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
 ):
     """
     Create a new deployment.
 
-    Triggers the deployment pipeline:
+    Triggers the deployment pipeline in background:
     1. Security scanning
     2. Docker build
     3. EC2 deployment
     4. Health checks
     """
     # Generate deployment ID
-    import uuid
-    deployment_id = uuid.uuid4().hex[:8]
+    deployment_id = f"deploy-{uuid.uuid4().hex[:8]}"
 
-    # Create new deployment
-    new_deployment = {
-        "id": deployment_id,
-        "repository": deployment.repository,
-        "instance_id": deployment.instance_id,
-        "commit_sha": None,  # Will be updated during deployment
-        "status": DeploymentStatus.PENDING,
-        "image_tag": None,
-        "port": deployment.port,
-        "strategy": deployment.strategy,
-        "environment": deployment.environment,
-        "created_at": datetime.utcnow().isoformat(),
-        "updated_at": None,
-        "duration_seconds": None,
-    }
+    # Create deployment service
+    service = DeploymentService(db)
 
-    MOCK_DEPLOYMENTS.insert(0, new_deployment)
+    # Create new deployment in database
+    new_deployment = service.create_deployment(
+        deployment_id=deployment_id,
+        repository=deployment.repository,
+        instance_id=deployment.instance_id,
+        user_id=current_user.get("user_id", 0),
+        port=deployment.port,
+        strategy=deployment.strategy,
+        environment=deployment.environment,
+        triggered_by=current_user.get("username", "unknown"),
+    )
 
-    # TODO: Trigger actual deployment workflow in background
-    # For now, just return the created deployment
+    # Trigger deployment workflow in background
+    background_tasks.add_task(
+        service.run_deployment_workflow,
+        deployment_id
+    )
 
-    return new_deployment
+    return _deployment_to_response(new_deployment)
 
 
 @router.get("/{deployment_id}/logs")
 async def get_deployment_logs(
     deployment_id: str,
     current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
 ):
     """
     Get deployment logs.
 
     Returns streaming logs for the deployment process.
     """
-    # Find deployment
-    deployment = next((d for d in MOCK_DEPLOYMENTS if d["id"] == deployment_id), None)
+    repo = DeploymentRepository(db)
 
+    # Check if deployment exists
+    deployment = repo.get_by_id(deployment_id)
     if not deployment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Deployment {deployment_id} not found"
         )
 
-    # Mock logs (replace with real logs later)
+    # Get logs from database
+    logs = repo.get_deployment_logs(deployment_id, limit=100)
+
+    # Convert to response format
+    log_responses = [
+        {
+            "timestamp": log.timestamp.isoformat(),
+            "level": log.level,
+            "message": log.message,
+            "agent": log.agent,
+        }
+        for log in logs
+    ]
+
     return {
         "deployment_id": deployment_id,
-        "logs": [
-            {"timestamp": "2026-02-14T13:52:11", "level": "INFO", "message": "Starting deployment"},
-            {"timestamp": "2026-02-14T13:52:12", "level": "INFO", "message": "Cloning repository"},
-            {"timestamp": "2026-02-14T13:52:14", "level": "INFO", "message": "Security scan passed"},
-            {"timestamp": "2026-02-14T13:55:00", "level": "INFO", "message": "Docker build complete"},
-            {"timestamp": "2026-02-14T14:00:13", "level": "INFO", "message": "Deployment successful"},
-        ]
+        "logs": log_responses,
     }
 
 
@@ -164,14 +169,15 @@ async def get_deployment_logs(
 async def rollback_deployment(
     deployment_id: str,
     current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
 ):
     """
     Rollback a deployment to previous version.
 
     Reverts to the last successful deployment.
     """
-    # Find deployment
-    deployment = next((d for d in MOCK_DEPLOYMENTS if d["id"] == deployment_id), None)
+    repo = DeploymentRepository(db)
+    deployment = repo.get_by_id(deployment_id)
 
     if not deployment:
         raise HTTPException(
@@ -179,8 +185,48 @@ async def rollback_deployment(
             detail=f"Deployment {deployment_id} not found"
         )
 
-    # Update status
-    deployment["status"] = DeploymentStatus.ROLLED_BACK
-    deployment["updated_at"] = datetime.utcnow().isoformat()
+    # Update status to rolled_back
+    updated_deployment = repo.update_status(deployment_id, "rolled_back")
 
-    return deployment
+    # TODO: Trigger actual rollback workflow in background
+
+    return _deployment_to_response(updated_deployment)
+
+
+def _deployment_to_response(deployment) -> DeploymentResponse:
+    """Convert database Deployment model to API response schema."""
+    # Extract port and environment from extra_data JSON field
+    extra_data = deployment.extra_data or {}
+    port = extra_data.get("port", 8080)
+    environment = extra_data.get("environment", "production")
+
+    # Map database status to API status enum
+    status_map = {
+        "pending": DeploymentStatus.PENDING,
+        "security_scanning": DeploymentStatus.SECURITY_SCANNING,
+        "security_failed": DeploymentStatus.FAILED,
+        "building": DeploymentStatus.BUILDING,
+        "build_failed": DeploymentStatus.FAILED,
+        "deploying": DeploymentStatus.DEPLOYING,
+        "deployed": DeploymentStatus.DEPLOYED,
+        "failed": DeploymentStatus.FAILED,
+        "rolling_back": DeploymentStatus.DEPLOYING,
+        "rolled_back": DeploymentStatus.ROLLED_BACK,
+    }
+
+    api_status = status_map.get(deployment.status.value if hasattr(deployment.status, 'value') else deployment.status, DeploymentStatus.PENDING)
+
+    return DeploymentResponse(
+        id=deployment.id,
+        repository=deployment.repository,
+        instance_id=deployment.instance_id,
+        commit_sha=deployment.commit_sha,
+        status=api_status,
+        image_tag=deployment.image_tag,
+        port=port,
+        strategy=deployment.strategy.value if hasattr(deployment.strategy, 'value') else deployment.strategy,
+        environment=environment,
+        created_at=deployment.created_at,
+        updated_at=deployment.updated_at,
+        duration_seconds=float(deployment.duration_seconds) if deployment.duration_seconds else None,
+    )

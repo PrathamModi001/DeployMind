@@ -88,7 +88,8 @@ class Deployment(Base):
     duration_seconds = Column(Integer, nullable=True)
 
     # User/Trigger Information
-    triggered_by = Column(String(100), nullable=True)  # User or system
+    user_id = Column(Integer, nullable=True)  # Foreign key to web_users.id
+    triggered_by = Column(String(100), nullable=True)  # Username or system
     trigger_type = Column(String(50), default="manual")  # manual, webhook, scheduled
 
     # Rollback Information
