@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 import time
 
 from .config import settings
-from .routes import auth, deployments, analytics
+from .routes import auth, deployments, analytics, websocket, ai, environment, monitoring, webhooks, security, github, uploads, instances
 
 # Set up logger
 logger = logging.getLogger("uvicorn.error")
@@ -76,6 +76,15 @@ async def log_requests(request: Request, call_next):
 app.include_router(auth.router)
 app.include_router(deployments.router)
 app.include_router(analytics.router)
+app.include_router(websocket.router)
+app.include_router(ai.router)
+app.include_router(environment.router)
+app.include_router(monitoring.router)
+app.include_router(webhooks.router)
+app.include_router(security.router)
+app.include_router(github.router)
+app.include_router(uploads.router)
+app.include_router(instances.router)
 
 
 @app.get("/")

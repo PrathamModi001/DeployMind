@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { LayoutDashboard, Rocket, BarChart3, LogOut, Menu } from 'lucide-react';
+import { LayoutDashboard, Rocket, BarChart3, LogOut, Menu, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import Link from 'next/link';
@@ -74,6 +74,13 @@ export default function DashboardLayout({
       icon: BarChart3,
       color: 'green',
       gradient: 'from-green-500/10 to-green-600/5'
+    },
+    {
+      name: 'AI Insights',
+      href: '/dashboard/ai-insights',
+      icon: Sparkles,
+      color: 'pink',
+      gradient: 'from-pink-500/10 to-pink-600/5'
     },
   ];
 

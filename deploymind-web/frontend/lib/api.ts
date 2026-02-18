@@ -67,6 +67,15 @@ export const api = {
       apiClient.get(`/api/deployments/${id}/logs`),
     rollback: (id: string) =>
       apiClient.post(`/api/deployments/${id}/rollback`),
+    // Environment variables
+    listEnvVars: (id: string) =>
+      apiClient.get(`/api/deployments/${id}/env`),
+    createEnvVar: (id: string, data: { key: string; value: string; is_secret: boolean }) =>
+      apiClient.post(`/api/deployments/${id}/env`, data),
+    updateEnvVar: (deploymentId: string, envId: number, data: { key: string; value: string; is_secret: boolean }) =>
+      apiClient.put(`/api/deployments/${deploymentId}/env/${envId}`, data),
+    deleteEnvVar: (deploymentId: string, envId: number) =>
+      apiClient.delete(`/api/deployments/${deploymentId}/env/${envId}`),
   },
 
   // Analytics
@@ -77,5 +86,43 @@ export const api = {
       apiClient.get('/api/analytics/timeline', { params: { days } }),
     performance: () =>
       apiClient.get('/api/analytics/performance'),
+  },
+
+  // AI Features
+  ai: {
+    recommendInstance: (data: { repository: string; language?: string; traffic_estimate?: string }) =>
+      apiClient.post('/api/ai/recommend/instance', data),
+    recommendStrategy: (params: { current_status: string; deployment_count: number; success_rate: number }) =>
+      apiClient.post('/api/ai/recommend/strategy', null, { params }),
+    analyzeCosts: (data: { deployment_count: number; avg_duration_seconds: number; instance_types: any }) =>
+      apiClient.post('/api/ai/optimize/costs', data),
+    estimateCost: (params: { instance_type: string; duration_hours: number; environment?: string }) =>
+      apiClient.get('/api/ai/optimize/estimate', { params }),
+    analyzeRollback: (data: {
+      deployment_id: string;
+      failed_checks: number;
+      total_checks: number;
+      error_messages: string[];
+      deployment_age_minutes: number;
+    }) =>
+      apiClient.post('/api/ai/rollback/analyze', data),
+    explainVulnerability: (data: { cve_id: string; package: string; severity: string; description?: string }) =>
+      apiClient.post('/api/ai/security/explain', data),
+  },
+
+  // Monitoring
+  monitoring: {
+    getMetrics: (deploymentId: string) =>
+      apiClient.get(`/api/monitoring/deployments/${deploymentId}/metrics`),
+    getMetricsHistory: (deploymentId: string, hours: number = 1) =>
+      apiClient.get(`/api/monitoring/deployments/${deploymentId}/metrics/history`, { params: { hours } }),
+    getHealth: (deploymentId: string) =>
+      apiClient.get(`/api/monitoring/deployments/${deploymentId}/health`),
+  },
+
+  // Webhooks
+  webhooks: {
+    getSetupInfo: () =>
+      apiClient.get('/api/webhooks/github/setup'),
   },
 };

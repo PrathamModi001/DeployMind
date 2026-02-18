@@ -27,12 +27,16 @@ try:
         DeploymentStatusEnum,
         DeploymentStrategyEnum,
     )
+    from deploymind.infrastructure.database.connection import Base as CoreBase
+    CORE_AVAILABLE = True
 except ImportError:
     # Mock if core not available
     Deployment = None
     DeploymentLog = None
     DeploymentStatusEnum = None
     DeploymentStrategyEnum = None
+    CoreBase = None
+    CORE_AVAILABLE = False
 
 # In-memory SQLite for testing
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
@@ -44,12 +48,17 @@ engine = create_engine(
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Create tables
-User.__table__.create(bind=engine, checkfirst=True)
-if Deployment:
-    Deployment.__table__.create(bind=engine, checkfirst=True)
-if DeploymentLog:
-    DeploymentLog.__table__.create(bind=engine, checkfirst=True)
+# Create all tables from deploymind-core and web
+if CORE_AVAILABLE and CoreBase:
+    # Create all core tables (Deployment, DeploymentLog, etc.)
+    CoreBase.metadata.create_all(bind=engine)
+else:
+    # Fallback: create individual tables
+    User.__table__.create(bind=engine, checkfirst=True)
+    if Deployment:
+        Deployment.__table__.create(bind=engine, checkfirst=True)
+    if DeploymentLog:
+        DeploymentLog.__table__.create(bind=engine, checkfirst=True)
 
 
 def override_get_db():

@@ -115,10 +115,16 @@ async def create_deployment(
         triggered_by=current_user.get("username", "unknown"),
     )
 
-    # Trigger deployment workflow in background
+    # Trigger full deployment workflow in background
     background_tasks.add_task(
         service.run_deployment_workflow,
-        deployment_id
+        deployment_id=deployment_id,
+        repository=deployment.repository,
+        instance_id=deployment.instance_id,
+        port=deployment.port,
+        strategy=deployment.strategy,
+        health_check_path=getattr(deployment, 'health_check_path', '/health'),
+        environment=deployment.environment,
     )
 
     return _deployment_to_response(new_deployment)

@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     github_client_secret: str
     github_redirect_uri: str = "http://localhost:5000/auth/callback"
 
+    # GitHub Webhooks
+    github_webhook_secret: str = ""
+    api_base_url: str = "http://localhost:8000"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

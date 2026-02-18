@@ -6,10 +6,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AnimatedCard } from '@/components/ui/animated-card';
+import { ResourceMonitor } from '@/components/resource-monitor';
 import { api } from '@/lib/api';
 import {
   ArrowLeft, GitBranch, Clock, Server, Terminal, Play, Square,
-  CheckCircle2, XCircle, Loader2, Activity, Shield, Rocket
+  CheckCircle2, XCircle, Loader2, Activity, Shield, Rocket, Settings
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
@@ -169,19 +170,32 @@ export default function DeploymentDetailPage() {
           </div>
         </div>
 
-        {/* Status badge - large */}
-        <Badge
-          variant="outline"
-          className={`
-            ${status.bg}
-            ${status.border}
-            ${status.color}
-            px-4 py-2 text-sm flex items-center gap-2
-          `}
-        >
-          <StatusIcon className={`w-4 h-4 ${status.animate}`} />
-          {deployment.status}
-        </Badge>
+        {/* Actions */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => router.push(`/dashboard/deployments/${params.id}/settings`)}
+          >
+            <Settings className="w-4 h-4" />
+            Settings
+          </Button>
+
+          {/* Status badge - large */}
+          <Badge
+            variant="outline"
+            className={`
+              ${status.bg}
+              ${status.border}
+              ${status.color}
+              px-4 py-2 text-sm flex items-center gap-2
+            `}
+          >
+            <StatusIcon className={`w-4 h-4 ${status.animate}`} />
+            {deployment.status}
+          </Badge>
+        </div>
       </div>
 
       {/* Terminal logs - Vercel style */}
@@ -324,9 +338,19 @@ export default function DeploymentDetailPage() {
         </div>
       </AnimatedCard>
 
-      {/* Actions */}
+      {/* Resource Monitor */}
       {deployment.status === 'DEPLOYED' && (
         <AnimatedCard delay={0.3}>
+          <div className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Resource Monitoring</h3>
+            <ResourceMonitor deploymentId={deployment.id} />
+          </div>
+        </AnimatedCard>
+      )}
+
+      {/* Actions */}
+      {deployment.status === 'DEPLOYED' && (
+        <AnimatedCard delay={0.4}>
           <div className="p-6">
             <h3 className="text-lg font-semibold mb-4">Actions</h3>
             <div className="flex gap-3">
