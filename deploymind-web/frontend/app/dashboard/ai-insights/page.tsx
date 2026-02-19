@@ -214,13 +214,27 @@ export default function AIInsightsPage() {
 
               <div className="space-y-2">
                 <p className="text-sm font-medium">Optimization Suggestions</p>
-                {costAnalysis.optimization_suggestions?.map((suggestion: string, i: number) => (
+                {costAnalysis.optimization_suggestions?.map((suggestion: any, i: number) => (
                   <div
                     key={i}
                     className="flex items-start gap-2 p-3 rounded-lg bg-green-500/5 border border-green-500/10"
                   >
                     <CheckCircle2 className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-muted-foreground">{suggestion}</span>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">
+                        {typeof suggestion === 'string' ? suggestion : suggestion.action}
+                      </p>
+                      {typeof suggestion === 'object' && suggestion.impact && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {suggestion.impact}
+                        </p>
+                      )}
+                      {typeof suggestion === 'object' && suggestion.savings_usd && (
+                        <p className="text-xs text-green-400 mt-1">
+                          Potential savings: ${suggestion.savings_usd.toFixed(2)}/mo
+                        </p>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

@@ -125,4 +125,16 @@ export const api = {
     getSetupInfo: () =>
       apiClient.get('/api/webhooks/github/setup'),
   },
+
+  // GitHub
+  github: {
+    listRepositories: (query?: string) =>
+      apiClient.get('/api/github/repositories', { params: { query: query || '' } }),
+    listBranches: (owner: string, repo: string) =>
+      apiClient.get(`/api/github/repositories/${owner}/${repo}/branches`),
+    detectFramework: (owner: string, repo: string) =>
+      apiClient.get(`/api/github/repositories/${owner}/${repo}/detect`),
+    getLatestCommit: (owner: string, repo: string, branch: string = 'main') =>
+      apiClient.get(`/api/github/repositories/${owner}/${repo}/commit`, { params: { branch } }),
+  },
 };

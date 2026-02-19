@@ -32,6 +32,7 @@ class User(Base):
 
     # OAuth fields (GitHub only)
     github_id = Column(String, unique=True, nullable=False, index=True)
+    github_access_token = Column(String, nullable=True)  # User's GitHub access token
     avatar_url = Column(String, nullable=True)
 
     # Status fields

@@ -3,39 +3,229 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
-import { ArrowLeft, Rocket, GitBranch, Server, Loader2 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { ArrowLeft, GitBranch, Server, Shield, Key, CheckCircle2, Rocket, Sparkles } from 'lucide-react';
+import { WizardContainer } from '@/components/wizard/wizard-container';
+import { RepositoryStep } from '@/components/wizard/steps/repository-step';
+import { InstanceStep } from '@/components/wizard/steps/instance-step';
+import { StrategyStep } from '@/components/wizard/steps/strategy-step';
+import { EnvironmentStep } from '@/components/wizard/steps/environment-step';
+import { ReviewStep } from '@/components/wizard/steps/review-step';
+import { DeployStep } from '@/components/wizard/steps/deploy-step';
+
+const WIZARD_STEPS = [
+  {
+    id: 'repository',
+    title: 'Repository',
+    description: 'Source code',
+    icon: GitBranch,
+  },
+  {
+    id: 'instance',
+    title: 'Instance',
+    description: 'Target server',
+    icon: Server,
+  },
+  {
+    id: 'strategy',
+    title: 'Strategy',
+    description: 'Deployment method',
+    icon: Shield,
+  },
+  {
+    id: 'environment',
+    title: 'Environment',
+    description: 'Variables',
+    icon: Key,
+  },
+  {
+    id: 'review',
+    title: 'Review',
+    description: 'Final check',
+    icon: CheckCircle2,
+  },
+  {
+    id: 'deploy',
+    title: 'Deploy',
+    description: 'Launch',
+    icon: Rocket,
+  },
+];
 
 export default function NewDeploymentPage() {
   const router = useRouter();
-  const [formData, setFormData] = useState({
-    repository: '',
-    instance_id: '',
-    environment: 'production',
+  const [currentStep, setCurrentStep] = useState(0);
+  const [deploymentId, setDeploymentId] = useState<string>('');
+  const [deploymentStatus, setDeploymentStatus] = useState<string>('pending');
+
+  // Wizard data state
+  const [wizardData, setWizardData] = useState({
+    repository: {
+      repository: '',
+      branch: 'main',
+      commit_sha: '',
+    },
+    instance: {
+      instance_id: '',
+      instance_type: undefined as string | undefined,
+      region: 'us-east-1',
+    },
+    strategy: {
+      strategy: 'rolling',
+    },
+    environment: {
+      environment_variables: [] as Array<{ key: string; value: string; isSecret: boolean }>,
+    },
+    review: {
+      enable_security_scan: true,
+      auto_rollback: true,
+      health_check_enabled: true,
+    },
   });
 
+  // Create deployment mutation
   const createDeploymentMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const response = await api.deployments.create(data);
+    mutationFn: async () => {
+      // Prepare deployment data
+      const deploymentData = {
+        repository: wizardData.repository.repository,
+        branch: wizardData.repository.branch,
+        commit_sha: wizardData.repository.commit_sha || undefined,
+        instance_id: wizardData.instance.instance_id || undefined,
+        instance_type: wizardData.instance.instance_type,
+        region: wizardData.instance.region,
+        strategy: wizardData.strategy.strategy,
+        environment: 'production',
+        environment_variables: wizardData.environment.environment_variables.reduce(
+          (acc, { key, value }) => {
+            if (key && value) {
+              acc[key] = value;
+            }
+            return acc;
+          },
+          {} as Record<string, string>
+        ),
+        enable_security_scan: wizardData.review.enable_security_scan,
+        auto_rollback: wizardData.review.auto_rollback,
+      };
+
+      const response = await api.deployments.create(deploymentData);
       return response.data;
     },
     onSuccess: (data) => {
-      router.push(`/dashboard/deployments/${data.id}`);
+      setDeploymentId(data.id);
+      setDeploymentStatus(data.status);
+      setCurrentStep(5); // Move to deploy step
+
+      // Poll for status updates (in real app, use WebSocket)
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusResponse = await api.deployments.get(data.id);
+          setDeploymentStatus(statusResponse.data.status);
+
+          // Stop polling when deployment is complete or failed
+          if (['deployed', 'failed', 'security_failed', 'build_failed'].includes(statusResponse.data.status)) {
+            clearInterval(pollInterval);
+          }
+        } catch (error) {
+          clearInterval(pollInterval);
+        }
+      }, 2000);
+    },
+    onError: (error) => {
+      console.error('Deployment failed:', error);
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    createDeploymentMutation.mutate(formData);
+  const handleNext = () => {
+    if (currentStep < WIZARD_STEPS.length - 1) {
+      if (currentStep === 4) {
+        // Review step - trigger deployment
+        createDeploymentMutation.mutate();
+      } else {
+        setCurrentStep(currentStep + 1);
+      }
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const updateStepData = (stepKey: string, data: any) => {
+    setWizardData((prev) => ({
+      ...prev,
+      [stepKey]: data,
+    }));
+  };
+
+  const renderStep = () => {
+    switch (currentStep) {
+      case 0:
+        return (
+          <RepositoryStep
+            data={wizardData.repository}
+            onChange={(data) => updateStepData('repository', data)}
+            onNext={handleNext}
+          />
+        );
+      case 1:
+        return (
+          <InstanceStep
+            data={wizardData.instance}
+            repositoryData={wizardData.repository}
+            onChange={(data) => updateStepData('instance', data)}
+            onNext={handleNext}
+            onBack={handleBack}
+          />
+        );
+      case 2:
+        return (
+          <StrategyStep
+            data={wizardData.strategy}
+            onChange={(data) => updateStepData('strategy', data)}
+            onNext={handleNext}
+            onBack={handleBack}
+          />
+        );
+      case 3:
+        return (
+          <EnvironmentStep
+            data={wizardData.environment}
+            onChange={(data) => updateStepData('environment', data)}
+            onNext={handleNext}
+            onBack={handleBack}
+          />
+        );
+      case 4:
+        return (
+          <ReviewStep
+            data={wizardData.review}
+            allData={wizardData}
+            onChange={(data) => updateStepData('review', data)}
+            onNext={handleNext}
+            onBack={handleBack}
+            isDeploying={createDeploymentMutation.isPending}
+          />
+        );
+      case 5:
+        return (
+          <DeployStep
+            deploymentId={deploymentId}
+            status={deploymentStatus}
+            onViewDetails={() => router.push(`/dashboard/deployments/${deploymentId}`)}
+          />
+        );
+      default:
+        return null;
+    }
   };
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 max-w-5xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Button
@@ -47,127 +237,21 @@ export default function NewDeploymentPage() {
           <ArrowLeft className="w-5 h-5" />
         </Button>
 
-        <div>
-          <h2 className="text-3xl font-semibold tracking-tight">New Deployment</h2>
+        <div className="flex-1">
+          <h2 className="text-3xl font-semibold tracking-tight flex items-center gap-3">
+            <Sparkles className="w-8 h-8 text-primary" />
+            New Deployment
+          </h2>
           <p className="text-muted-foreground mt-1">
-            Deploy your application to AWS EC2
+            Deploy your application with AI-powered recommendations
           </p>
         </div>
       </div>
 
-      {/* Form Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-      >
-        <Card className="relative overflow-hidden border border-border/50">
-          {/* Gradient background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent" />
-
-          <form onSubmit={handleSubmit} className="relative p-6 space-y-6">
-            {/* Repository */}
-            <div className="space-y-2">
-              <Label htmlFor="repository" className="flex items-center gap-2">
-                <GitBranch className="w-4 h-4 text-primary" />
-                GitHub Repository
-              </Label>
-              <Input
-                id="repository"
-                placeholder="owner/repository"
-                value={formData.repository}
-                onChange={(e) => setFormData({ ...formData, repository: e.target.value })}
-                className="font-mono"
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                Example: deploymind/sample-app
-              </p>
-            </div>
-
-            {/* Instance ID */}
-            <div className="space-y-2">
-              <Label htmlFor="instance_id" className="flex items-center gap-2">
-                <Server className="w-4 h-4 text-primary" />
-                EC2 Instance ID
-              </Label>
-              <Input
-                id="instance_id"
-                placeholder="i-1234567890abcdef0"
-                value={formData.instance_id}
-                onChange={(e) => setFormData({ ...formData, instance_id: e.target.value })}
-                className="font-mono"
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                AWS EC2 instance ID where the application will be deployed
-              </p>
-            </div>
-
-            {/* Environment */}
-            <div className="space-y-2">
-              <Label htmlFor="environment">Environment</Label>
-              <select
-                id="environment"
-                value={formData.environment}
-                onChange={(e) => setFormData({ ...formData, environment: e.target.value })}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="production">Production</option>
-                <option value="staging">Staging</option>
-                <option value="development">Development</option>
-              </select>
-            </div>
-
-            {/* Submit Button */}
-            <div className="flex gap-3 pt-4">
-              <Button
-                type="submit"
-                className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
-                disabled={createDeploymentMutation.isPending}
-              >
-                {createDeploymentMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <Rocket className="w-4 h-4" />
-                    Deploy Now
-                  </>
-                )}
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => router.push('/dashboard/deployments')}
-                disabled={createDeploymentMutation.isPending}
-              >
-                Cancel
-              </Button>
-            </div>
-
-            {/* Error Message */}
-            {createDeploymentMutation.isError && (
-              <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-                Failed to create deployment. Please check your input and try again.
-              </div>
-            )}
-          </form>
-        </Card>
-      </motion.div>
-
-      {/* Help Card */}
-      <Card className="p-6 bg-muted/50 border-dashed">
-        <h3 className="font-semibold mb-2">Need help?</h3>
-        <ul className="text-sm text-muted-foreground space-y-1">
-          <li>• Make sure your GitHub repository is accessible</li>
-          <li>• EC2 instance must be running and accessible</li>
-          <li>• Security groups should allow inbound traffic</li>
-        </ul>
-      </Card>
+      {/* Wizard */}
+      <WizardContainer steps={WIZARD_STEPS} currentStep={currentStep}>
+        {renderStep()}
+      </WizardContainer>
     </div>
   );
 }

@@ -148,11 +148,12 @@ async def github_oauth_callback(
 
         if db_user:
             logger.info(f"[OAUTH] Existing user: {user_email}")
-            # Update user info
+            # Update user info AND GitHub access token
             db_user = repo.update_user(
                 db_user.id,
                 avatar_url=github_user.get("avatar_url"),
                 full_name=github_user.get("name") or github_user["login"],
+                github_access_token=github_token,  # Save the user's GitHub token!
             )
         else:
             logger.info(f"[OAUTH] Creating new user: {user_email}")
@@ -164,6 +165,7 @@ async def github_oauth_callback(
                     github_id=github_id,
                     avatar_url=github_user.get("avatar_url"),
                     full_name=github_user.get("name") or github_user["login"],
+                    github_access_token=github_token,  # Save the user's GitHub token!
                 )
             except IntegrityError:
                 # Email or username might be taken

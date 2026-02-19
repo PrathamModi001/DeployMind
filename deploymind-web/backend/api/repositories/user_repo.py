@@ -45,6 +45,7 @@ class UserRepository:
         github_id: str,
         full_name: Optional[str] = None,
         avatar_url: Optional[str] = None,
+        github_access_token: Optional[str] = None,
     ) -> User:
         """
         Create new user (GitHub OAuth only).
@@ -55,6 +56,7 @@ class UserRepository:
             github_id: GitHub OAuth ID (required)
             full_name: User's full name
             avatar_url: Profile picture URL
+            github_access_token: User's GitHub OAuth access token
 
         Returns:
             User: Created user object
@@ -68,6 +70,7 @@ class UserRepository:
             github_id=github_id,
             full_name=full_name,
             avatar_url=avatar_url,
+            github_access_token=github_access_token,
         )
 
         self.db.add(user)
