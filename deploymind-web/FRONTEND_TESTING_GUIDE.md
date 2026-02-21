@@ -672,6 +672,242 @@ List UX improvements or features:
 
 ---
 
+## 🎯 12. AI Actions (Actionable Recommendations) Testing
+
+### 12.1 Setup & Prerequisites
+**URL:** `http://localhost:5000/dashboard/ai-insights`
+
+| Step | Action | Expected Result | ✅ |
+|------|--------|----------------|---|
+| 1 | Start PostgreSQL database | `docker-compose up -d` succeeds | ☐ |
+| 2 | Initialize action_executions table | Run `python -c "from api.services.database import init_web_db; init_web_db()"` | ☐ |
+| 3 | Verify backend running | `curl http://localhost:8000/health` returns 200 | ☐ |
+| 4 | Navigate to AI Insights | Page loads with 3 sections: Scaling, Cost, Security | ☐ |
+
+### 12.2 Auto-Scaling Actions
+**Test: Scale Instance (Vertical Scaling)**
+
+| Step | Action | Expected Result | ✅ |
+|------|--------|----------------|---|
+| 1 | View scaling recommendation | Shows "Upgrade to t2.small" with CPU/Memory metrics | ☐ |
+| 2 | Check recommendation details | Shows: Cost impact (+$8.46/mo), Downtime (~2 min), Performance (+50%) | ☐ |
+| 3 | Click "Apply" button | Confirmation dialog appears | ☐ |
+| 4 | Review confirmation dialog | Shows: Impact summary, Downtime warning, Cost change | ☐ |
+| 5 | Click "Confirm" | Dialog closes, button shows "Applying... 0%" | ☐ |
+| 6 | Watch progress | Button updates: "Applying... 20%" → "Applying... 50%" → "Applying... 90%" | ☐ |
+| 7 | Wait for completion (~3 min) | Button shows "Applied ✓" with checkmark | ☐ |
+| 8 | Verify auto-refresh | Scaling recommendation updates/disappears | ☐ |
+| 9 | Check backend logs | See: "Stopping instance", "Modifying type", "Starting instance" | ☐ |
+
+**Edge Cases:**
+| Test Case | Action | Expected Result | ✅ |
+|-----------|--------|----------------|---|
+| Cancel confirmation | Click "Apply" → "Cancel" | Dialog closes, no action executed | ☐ |
+| Network error | Disconnect internet → Click "Apply" | Shows error: "Failed to execute scaling: ..." | ☐ |
+| Concurrent actions | Click "Apply" twice rapidly | Second click disabled during execution | ☐ |
+| Timeout | Mock long-running action (>10 min) | Shows error: "Action execution timed out" | ☐ |
+
+### 12.3 Cost Optimization Actions
+**Test: Stop Idle Deployments**
+
+| Step | Action | Expected Result | ✅ |
+|------|--------|----------------|---|
+| 1 | View cost trends | Shows "Stop 2 idle deployments" recommendation | ☐ |
+| 2 | Check savings estimate | Shows "Save $16.94/month" | ☐ |
+| 3 | Click "Apply" button | Confirmation dialog appears | ☐ |
+| 4 | Review confirmation | Shows: 2 deployments affected, $16.94 savings, Warning message | ☐ |
+| 5 | Click "Confirm" | Action executes, button shows "Applying..." | ☐ |
+| 6 | Wait for completion | Button shows "Applied ✓" | ☐ |
+| 7 | Verify instances stopped | Check EC2 console or deployment list - instances stopped | ☐ |
+| 8 | Verify cost forecast | Cost trend updates with reduced forecast | ☐ |
+
+**Backend Verification:**
+```bash
+# Check action_executions table
+psql -U admin -d deploymind -c "SELECT * FROM action_executions ORDER BY created_at DESC LIMIT 5;"
+
+# Expected columns:
+# - id: exec-abc123
+# - user_id: 1
+# - action_type: stop_idle_deployments
+# - status: completed
+# - parameters: {"deployment_ids": [...], "reason": "Cost optimization"}
+# - result: {"stopped_count": 2, "failed_count": 0, ...}
+# - progress_percent: 100
+# - created_at, started_at, completed_at timestamps
+```
+
+### 12.4 Security Actions
+**Test: Trigger Security Scan**
+
+| Step | Action | Expected Result | ✅ |
+|------|--------|----------------|---|
+| 1 | View security risk | Shows "Run fresh security scan" (scan is 8 days old) | ☐ |
+| 2 | Click "Apply" (No confirmation) | Action starts immediately (safe action) | ☐ |
+| 3 | Watch progress | Button shows "Applying... 30%" → "Applying... 80%" | ☐ |
+| 4 | Wait for scan (~5 min) | Button shows "Applied ✓" | ☐ |
+| 5 | Verify scan results | Security risk score updates, scan age = 0 days | ☐ |
+| 6 | Check vulnerability counts | Shows updated: Critical, High, Medium, Low counts | ☐ |
+
+### 12.5 Status Polling & Real-time Updates
+
+| Test Case | Action | Expected Result | ✅ |
+|-----------|--------|----------------|---|
+| Polling frequency | Monitor Network tab during action | Polls `/api/ai/actions/status/{id}` every 2 seconds | ☐ |
+| Progress updates | Watch progress percentage | Updates smoothly: 0% → 20% → 50% → 90% → 100% | ☐ |
+| Error handling | Mock backend error | Shows error message, stops polling | ☐ |
+| Page refresh during action | Refresh page mid-action | Action continues in background (check status via API) | ☐ |
+
+### 12.6 Multiple Recommendations
+
+| Step | Action | Expected Result | ✅ |
+|------|--------|----------------|---|
+| 1 | View page with 3+ recommendations | Each has independent "Apply" button | ☐ |
+| 2 | Click multiple Apply buttons | Can apply actions in sequence (not parallel) | ☐ |
+| 3 | Execute 1st action | Other buttons remain enabled | ☐ |
+| 4 | Execute 2nd while 1st running | 2nd action queues, starts after 1st completes | ☐ |
+
+### 12.7 Authorization & Security
+
+| Test Case | Action | Expected Result | ✅ |
+|-----------|--------|----------------|---|
+| Unauthorized user | Logout → Try to poll status via API | Returns 401 Unauthorized | ☐ |
+| Wrong user | User A tries to view User B's execution | Returns 403 Forbidden | ☐ |
+| Invalid execution ID | Poll `/api/ai/actions/status/invalid-id` | Returns 404 Not Found | ☐ |
+| Missing parameters | Send incomplete request | Returns 400 Bad Request with validation error | ☐ |
+
+---
+
+## 🗑️ 13. Deployment Deletion Testing
+
+### 13.1 Delete Button Visibility
+**URL:** `http://localhost:5000/dashboard/deployments/[id]`
+
+| Step | Action | Expected Result | ✅ |
+|------|--------|----------------|---|
+| 1 | Navigate to deployment details | Page loads with deployment information | ☐ |
+| 2 | Locate "Delete Deployment" button | Red button visible (destructive variant) | ☐ |
+| 3 | Check button styling | Shows trash icon + "Delete Deployment" text | ☐ |
+
+### 13.2 Deletion Flow
+
+| Step | Action | Expected Result | ✅ |
+|------|--------|----------------|---|
+| 1 | Click "Delete Deployment" | Confirmation dialog appears | ☐ |
+| 2 | Review dialog title | Shows "⚠️ Delete Deployment" in red | ☐ |
+| 3 | Read warning message | "This action cannot be undone" displayed | ☐ |
+| 4 | Check deletion scope | Lists 6 items to be deleted: deployment, scans, builds, health checks, logs, executions | ☐ |
+| 5 | Verify deployment info | Shows deployment name/ID in bordered box | ☐ |
+| 6 | Click "Cancel" | Dialog closes, deployment NOT deleted | ☐ |
+| 7 | Click "Delete Deployment" again | Dialog reopens | ☐ |
+| 8 | Click "Delete Permanently" | Button shows "Deleting..." with spinner | ☐ |
+| 9 | Wait for completion | Dialog closes, redirects to `/dashboard/deployments` | ☐ |
+| 10 | Check deployments list | Deleted deployment no longer appears | ☐ |
+
+### 13.3 Cascade Deletion Verification
+
+**Backend Database Checks:**
+```bash
+# Before deletion - Record deployment ID
+DEPLOYMENT_ID="dep-abc123"
+
+# After deletion - Verify cascade
+psql -U admin -d deploymind << EOF
+-- Deployment should be gone
+SELECT COUNT(*) FROM deployments WHERE id = '$DEPLOYMENT_ID';
+-- Expected: 0
+
+-- Related records should be gone
+SELECT COUNT(*) FROM security_scans WHERE deployment_id = '$DEPLOYMENT_ID';
+-- Expected: 0
+
+SELECT COUNT(*) FROM build_results WHERE deployment_id = '$DEPLOYMENT_ID';
+-- Expected: 0
+
+SELECT COUNT(*) FROM health_checks WHERE deployment_id = '$DEPLOYMENT_ID';
+-- Expected: 0
+
+SELECT COUNT(*) FROM deployment_logs WHERE deployment_id = '$DEPLOYMENT_ID';
+-- Expected: 0
+
+SELECT COUNT(*) FROM agent_executions WHERE deployment_id = '$DEPLOYMENT_ID';
+-- Expected: 0
+EOF
+```
+
+| Verification | SQL Query | Expected Count | ✅ |
+|--------------|-----------|---------------|---|
+| Deployments | `SELECT COUNT(*) FROM deployments WHERE id = '...'` | 0 | ☐ |
+| Security Scans | `SELECT COUNT(*) FROM security_scans WHERE deployment_id = '...'` | 0 | ☐ |
+| Build Results | `SELECT COUNT(*) FROM build_results WHERE deployment_id = '...'` | 0 | ☐ |
+| Health Checks | `SELECT COUNT(*) FROM health_checks WHERE deployment_id = '...'` | 0 | ☐ |
+| Logs | `SELECT COUNT(*) FROM deployment_logs WHERE deployment_id = '...'` | 0 | ☐ |
+| Agent Executions | `SELECT COUNT(*) FROM agent_executions WHERE deployment_id = '...'` | 0 | ☐ |
+
+### 13.4 Error Handling
+
+| Test Case | Action | Expected Result | ✅ |
+|-----------|--------|----------------|---|
+| Delete non-existent deployment | Try to delete already-deleted deployment | Shows 404 error: "Deployment not found" | ☐ |
+| Network error during deletion | Disconnect internet → Click "Delete Permanently" | Shows error in dialog, doesn't redirect | ☐ |
+| Database error | Mock DB constraint violation | Shows 500 error: "Failed to delete deployment" | ☐ |
+| Unauthorized deletion | User A tries to delete User B's deployment | Returns 403 Forbidden (if implemented) | ☐ |
+
+### 13.5 Edge Cases
+
+| Test Case | Action | Expected Result | ✅ |
+|-----------|--------|----------------|---|
+| Rapid clicks | Click "Delete Permanently" multiple times | Button disabled after first click, prevents duplicate requests | ☐ |
+| Delete active deployment | Delete deployment in "DEPLOYED" status | Deletes successfully (no restrictions) | ☐ |
+| Delete failed deployment | Delete deployment in "FAILED" status | Deletes successfully | ☐ |
+| Dialog close during deletion | Close browser tab while deleting | Deletion completes in backend (check database) | ☐ |
+
+### 13.6 UI/UX Validation
+
+| Aspect | Check | Expected | ✅ |
+|--------|-------|----------|---|
+| Button color | Visual inspection | Red background (destructive) | ☐ |
+| Icon | Visual inspection | Trash icon visible | ☐ |
+| Dialog backdrop | Click outside dialog | Dialog stays open (doesn't close) | ☐ |
+| Warning emphasis | Visual inspection | Red warning box with AlertTriangle icon | ☐ |
+| Deployment info | Visual inspection | Deployment name shown in monospace font | ☐ |
+| Loading state | During deletion | Button shows spinner + "Deleting..." text | ☐ |
+| Success feedback | After deletion | Smooth redirect, no error flashes | ☐ |
+
+### 13.7 Analytics Impact
+
+| Check | Action | Expected Result | ✅ |
+|-------|--------|----------------|---|
+| Total deployments | Delete deployment → Check analytics | Total deployments count decreases by 1 | ☐ |
+| Success rate | Delete failed deployment | Success rate recalculates correctly | ☐ |
+| Query invalidation | Delete deployment | Deployments list refreshes automatically | ☐ |
+
+---
+
+## 🧪 14. Integration Testing (AI Actions + Deletion)
+
+### Test Scenario: Complete Workflow
+| Step | Action | Expected Result | ✅ |
+|------|--------|----------------|---|
+| 1 | Create new deployment | Deployment created successfully | ☐ |
+| 2 | Navigate to AI Insights | Shows recommendations for new deployment | ☐ |
+| 3 | Trigger security scan | Scan completes, shows results | ☐ |
+| 4 | Verify scan in deployment details | Security scan results visible | ☐ |
+| 5 | Stop idle deployment via AI action | Deployment stopped successfully | ☐ |
+| 6 | Delete stopped deployment | Deletion succeeds | ☐ |
+| 7 | Verify action_executions table | Action records exist but deployment is gone | ☐ |
+| 8 | Check AI Insights again | No longer shows deleted deployment | ☐ |
+
+### Performance Testing
+| Metric | Test | Target | Actual | ✅ |
+|--------|------|--------|--------|---|
+| Action initiation | Click "Apply" → API call | < 500ms | ___ms | ☐ |
+| Status polling response | GET /api/ai/actions/status/{id} | < 200ms | ___ms | ☐ |
+| Deletion time | Click "Delete" → Redirect | < 2s | ___s | ☐ |
+| Page refresh after action | Query invalidation → Re-render | < 1s | ___s | ☐ |
+
+---
+
 ## 🐛 Bug Report Template
 
 If you find a bug, report it with this format:

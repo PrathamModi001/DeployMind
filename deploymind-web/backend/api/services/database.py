@@ -80,12 +80,14 @@ def init_web_db():
     """
     from ..models.user import User
     from ..models.environment_variable import EnvironmentVariable
+    from ..models.action_execution import ActionExecution
 
     # Create web-specific tables
     User.__table__.create(bind=engine, checkfirst=True)
     EnvironmentVariable.__table__.create(bind=engine, checkfirst=True)
+    ActionExecution.__table__.create(bind=engine, checkfirst=True)
 
-    print("✓ Web database tables initialized")
+    print("Web database tables initialized")
 
 
 def check_db_connection() -> bool:

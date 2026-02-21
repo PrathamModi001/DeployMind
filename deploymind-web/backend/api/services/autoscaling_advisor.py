@@ -60,7 +60,7 @@ class AutoScalingAdvisor:
         if CORE_AVAILABLE and CoreSettings and GroqClient:
             try:
                 settings = CoreSettings.load()
-                self.llm = GroqClient(settings)
+                self.llm = GroqClient(settings.groq_api_key)
                 logger.info("AutoScalingAdvisor initialized with LLM")
             except Exception as e:
                 logger.warning(f"Failed to initialize LLM: {e}")
@@ -95,6 +95,7 @@ class AutoScalingAdvisor:
 
             if not deployment:
                 return self._mock_recommendation(deployment_id)
+
 
             # Get metrics history
             metrics = await self._get_metrics_history(deployment_id, hours_lookback)
@@ -138,7 +139,15 @@ class AutoScalingAdvisor:
                     scaling_decision
                 )
 
-            return {
+            # Create actionable recommendation
+            actionable_rec = self._create_actionable_recommendation(
+                deployment_id,
+                deployment,
+                recommendation,
+                utilization
+            )
+
+            result = {
                 "deployment_id": deployment_id,
                 "should_scale": True,
                 "scaling_type": recommendation["scaling_type"],
@@ -148,10 +157,13 @@ class AutoScalingAdvisor:
                 "performance_improvement": recommendation["performance_improvement"],
                 "reasoning": recommendation["reasoning"],
                 "utilization": utilization,
-                "analysis_timestamp": datetime.utcnow().isoformat()
+                "analysis_timestamp": datetime.utcnow().isoformat(),
+                "actionable_recommendations": [actionable_rec] if actionable_rec else []
             }
+            return result
 
         except Exception as e:
+            import traceback
             logger.error(f"Scaling recommendation failed: {e}", exc_info=True)
             return self._mock_recommendation(deployment_id)
 
@@ -274,10 +286,9 @@ class AutoScalingAdvisor:
         """
 
         try:
-            response = await self.llm.complete(
-                prompt=prompt,
+            response = self.llm.chat_completion(
                 model="llama-3.1-70b-versatile",
-                max_tokens=400
+                messages=[{"role": "user", "content": prompt}]
             )
 
             import json
@@ -333,7 +344,7 @@ class AutoScalingAdvisor:
                     "instance_count": 1
                 },
                 "cost_impact": cost_impact,
-                "performance_improvement": 50,  # Estimated 50% improvement
+                "performance_improvement": "50% capacity increase",  # String as expected by schema
                 "reasoning": reasoning
             }
 
@@ -351,7 +362,7 @@ class AutoScalingAdvisor:
                     "instance_count": 1
                 },
                 "cost_impact": cost_impact,
-                "performance_improvement": -10,  # Slight performance reduction
+                "performance_improvement": "Slight performance trade-off for cost savings",  # String as expected by schema
                 "reasoning": f"Downgrade to {recommended_type} to reduce costs"
             }
 
@@ -396,8 +407,76 @@ class AutoScalingAdvisor:
 
         return metrics
 
+    def _create_actionable_recommendation(
+        self,
+        deployment_id: str,
+        deployment,
+        recommendation: Dict,
+        utilization: Dict
+    ) -> Dict:
+        """Create actionable recommendation for scaling."""
+        import uuid
+
+        current_type = recommendation["recommended_config"]["instance_type"]
+        target_type = recommendation["recommended_config"]["instance_type"]
+        cost_change = recommendation["cost_impact"]
+
+        # Estimate downtime (typically 2-3 minutes for instance stop/modify/start)
+        downtime_minutes = 2
+
+        return {
+            "id": f"scale-{deployment_id}-{uuid.uuid4().hex[:8]}",
+            "action_type": "scale_instance",
+            "title": f"Upgrade to {target_type}",
+            "description": recommendation["reasoning"],
+            "parameters": {
+                "deployment_id": deployment_id,
+                "current_instance_type": self._get_current_config(deployment)["instance_type"],
+                "target_instance_type": target_type,
+                "instance_id": deployment.instance_id if hasattr(deployment, 'instance_id') else "unknown"
+            },
+            "impact": {
+                "cost_change_monthly": cost_change,
+                "downtime_minutes": downtime_minutes,
+                "performance_improvement_percent": recommendation.get("performance_improvement", 50)
+            },
+            "requires_confirmation": True,
+            "confirmation_message": (
+                f"This will stop the instance for ~{downtime_minutes} minutes and "
+                f"{'increase' if cost_change > 0 else 'decrease'} costs by ${abs(cost_change):.2f}/month."
+            ),
+            "confidence": "high",
+            "estimated_duration_minutes": 3,
+            "can_undo": True
+        }
+
     def _mock_recommendation(self, deployment_id: str) -> Dict:
         """Return mock recommendation."""
+        import uuid
+
+        actionable_rec = {
+            "id": f"scale-{deployment_id}-{uuid.uuid4().hex[:8]}",
+            "action_type": "scale_instance",
+            "title": "Upgrade to t2.small",
+            "description": "High average CPU utilization (75%) requires more resources",
+            "parameters": {
+                "deployment_id": deployment_id,
+                "current_instance_type": "t2.micro",
+                "target_instance_type": "t2.small",
+                "instance_id": "i-mock123456"
+            },
+            "impact": {
+                "cost_change_monthly": 8.46,
+                "downtime_minutes": 2,
+                "performance_improvement_percent": 50
+            },
+            "requires_confirmation": True,
+            "confirmation_message": "This will stop the instance for ~2 minutes and increase costs by $8.46/month.",
+            "confidence": "high",
+            "estimated_duration_minutes": 3,
+            "can_undo": True
+        }
+
         return {
             "deployment_id": deployment_id,
             "should_scale": True,
@@ -421,5 +500,6 @@ class AutoScalingAdvisor:
                 "avg_memory": 65.1,
                 "peak_memory": 78.5
             },
-            "analysis_timestamp": datetime.utcnow().isoformat()
+            "analysis_timestamp": datetime.utcnow().isoformat(),
+            "actionable_recommendations": [actionable_rec]
         }

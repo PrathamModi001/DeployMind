@@ -54,7 +54,7 @@ class CostAnalyzer:
         if CORE_AVAILABLE and CoreSettings and GroqClient:
             try:
                 settings = CoreSettings.load()
-                self.llm = GroqClient(settings)
+                self.llm = GroqClient(settings.groq_api_key)
                 logger.info("CostAnalyzer initialized with LLM")
             except Exception as e:
                 logger.warning(f"Failed to initialize LLM: {e}")
@@ -91,11 +91,14 @@ class CostAnalyzer:
                 return {
                     "user_id": user_id,
                     "trend": "no_data",
+                    "monthly_growth_rate_percent": 0.0,
                     "monthly_costs": [],
                     "total_cost_current_month": 0.0,
                     "forecast_next_3_months": [],
                     "optimization_opportunities": ["No deployments to analyze"],
-                    "potential_savings_monthly": 0.0
+                    "potential_savings_monthly": 0.0,
+                    "analysis_timestamp": datetime.utcnow().isoformat(),
+                    "actionable_recommendations": []
                 }
 
             # Calculate historical monthly costs
@@ -113,7 +116,13 @@ class CostAnalyzer:
             # Find optimization opportunities
             optimizations = self._find_optimizations(deployments, monthly_costs)
 
-            return {
+            # Create actionable recommendations
+            actionable_recs = self._create_actionable_recommendations(
+                deployments,
+                optimizations
+            )
+
+            result = {
                 "user_id": user_id,
                 "trend": trend_analysis["trend"],
                 "monthly_growth_rate_percent": trend_analysis["growth_rate"],
@@ -122,10 +131,13 @@ class CostAnalyzer:
                 "forecast_next_3_months": forecast,
                 "optimization_opportunities": optimizations["opportunities"],
                 "potential_savings_monthly": optimizations["savings"],
-                "analysis_timestamp": datetime.utcnow().isoformat()
+                "analysis_timestamp": datetime.utcnow().isoformat(),
+                "actionable_recommendations": actionable_recs
             }
+            return result
 
         except Exception as e:
+            import traceback
             logger.error(f"Cost analysis failed: {e}", exc_info=True)
             return self._mock_analysis(user_id)
 
@@ -136,27 +148,53 @@ class CostAnalyzer:
     ) -> List[Dict]:
         """Calculate monthly costs from deployments."""
         monthly_costs = []
+        now = datetime.utcnow()
 
         # Calculate for each of the last N months
         for i in range(months, 0, -1):
-            month_date = datetime.utcnow() - timedelta(days=30 * i)
-            month_str = month_date.strftime("%Y-%m")
+            # Calculate month boundaries
+            if i == 1:
+                # Current month - from start of month to now
+                month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                month_end = now
+                month_str = now.strftime("%Y-%m")
+            else:
+                # Past months - full month
+                target_date = now - timedelta(days=30 * (i - 1))
+                month_start = target_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                # End of month (approximate)
+                next_month = month_start + timedelta(days=32)
+                month_end = next_month.replace(day=1) - timedelta(days=1)
+                month_str = month_start.strftime("%Y-%m")
 
-            # Simulate costs based on deployment count and uptime
-            # In production, this would query actual billing data
-            active_deployments = len([
-                d for d in deployments
-                if d.created_at <= month_date
-            ])
+            # Count deployments active during this month
+            active_deployments = []
+            for d in deployments:
+                # Deployment was created before or during this month and still running
+                if d.created_at <= month_end:
+                    # Check if deployment is still active (DEPLOYED status)
+                    if hasattr(d, 'status') and d.status == 'DEPLOYED':
+                        active_deployments.append(d)
 
-            # Estimate cost (t2.micro = $0.0116/hour * 730 hours = $8.47/month)
-            base_cost = 8.47  # t2.micro full month
-            monthly_cost = active_deployments * base_cost * (0.7 + (i / months) * 0.3)
+            # Calculate cost based on active time
+            base_cost_per_hour = 0.0116  # t2.micro per hour
+            if i == 1:
+                # Current month - partial cost based on days running
+                total_cost = 0.0
+                for d in active_deployments:
+                    deploy_start = max(d.created_at, month_start)
+                    hours_running = (month_end - deploy_start).total_seconds() / 3600
+                    total_cost += hours_running * base_cost_per_hour
+                monthly_cost = total_cost
+            else:
+                # Past full months
+                hours_in_month = 730  # Average month
+                monthly_cost = len(active_deployments) * base_cost_per_hour * hours_in_month
 
             monthly_costs.append({
                 "month": month_str,
                 "cost": round(monthly_cost, 2),
-                "active_deployments": active_deployments
+                "active_deployments": len(active_deployments)
             })
 
         return monthly_costs
@@ -229,10 +267,9 @@ class CostAnalyzer:
         """
 
         try:
-            response = await self.llm.complete(
-                prompt=prompt,
+            response = self.llm.chat_completion(
                 model="llama-3.1-70b-versatile",
-                max_tokens=300
+                messages=[{"role": "user", "content": prompt}]
             )
 
             import json
@@ -267,6 +304,48 @@ class CostAnalyzer:
             })
 
         return forecasts
+
+    def _create_actionable_recommendations(
+        self,
+        deployments: List,
+        optimizations: Dict
+    ) -> List[Dict]:
+        """Create actionable recommendations from optimizations."""
+        import uuid
+
+        recommendations = []
+
+        # Find idle deployments
+        idle_deployments = [
+            d for d in deployments
+            if hasattr(d, 'status') and d.status in ['stopped', 'failed']
+        ]
+
+        if len(idle_deployments) >= 2:
+            idle_ids = [d.id for d in idle_deployments[:5]]  # Max 5
+            savings = len(idle_ids) * 8.47
+
+            recommendations.append({
+                "id": f"stop-idle-{uuid.uuid4().hex[:8]}",
+                "action_type": "stop_idle_deployments",
+                "title": f"Stop {len(idle_ids)} idle deployments",
+                "description": f"Remove idle deployments to save ${savings:.2f}/month",
+                "parameters": {
+                    "deployment_ids": idle_ids,
+                    "reason": "Cost optimization - idle deployment cleanup"
+                },
+                "impact": {
+                    "savings_monthly": savings,
+                    "deployments_affected": len(idle_ids)
+                },
+                "requires_confirmation": True,
+                "confirmation_message": f"This will stop {len(idle_ids)} idle instances, saving ${savings:.2f}/month.",
+                "confidence": "high",
+                "estimated_duration_minutes": 2,
+                "can_undo": False
+            })
+
+        return recommendations
 
     def _find_optimizations(
         self,
@@ -320,6 +399,28 @@ class CostAnalyzer:
 
     def _mock_analysis(self, user_id: int) -> Dict:
         """Return mock cost analysis."""
+        import uuid
+
+        mock_rec = {
+            "id": f"stop-idle-{uuid.uuid4().hex[:8]}",
+            "action_type": "stop_idle_deployments",
+            "title": "Stop 2 idle deployments",
+            "description": "Remove idle deployments to save $16.94/month",
+            "parameters": {
+                "deployment_ids": ["mock-dep-1", "mock-dep-2"],
+                "reason": "Cost optimization - idle deployment cleanup"
+            },
+            "impact": {
+                "savings_monthly": 16.94,
+                "deployments_affected": 2
+            },
+            "requires_confirmation": True,
+            "confirmation_message": "This will stop 2 idle instances, saving $16.94/month.",
+            "confidence": "high",
+            "estimated_duration_minutes": 2,
+            "can_undo": False
+        }
+
         return {
             "user_id": user_id,
             "trend": "increasing",
@@ -344,5 +445,6 @@ class CostAnalyzer:
                 "Use t2.micro instances to maximize free tier (750 hours/month)"
             ],
             "potential_savings_monthly": 21.94,
-            "analysis_timestamp": datetime.utcnow().isoformat()
+            "analysis_timestamp": datetime.utcnow().isoformat(),
+            "actionable_recommendations": [mock_rec]
         }

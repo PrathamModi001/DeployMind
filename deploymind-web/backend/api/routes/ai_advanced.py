@@ -49,6 +49,8 @@ class ScalingRecommendationResponse(BaseModel):
     performance_improvement: Optional[str] = None
     reasoning: Optional[str] = None
     analysis_timestamp: Optional[str] = None
+    utilization: Optional[Dict] = None
+    actionable_recommendations: Optional[List[Dict]] = []
 
 
 class CostAnalysisResponse(BaseModel):
@@ -62,6 +64,7 @@ class CostAnalysisResponse(BaseModel):
     optimization_opportunities: List[str]
     potential_savings_monthly: float
     analysis_timestamp: str
+    actionable_recommendations: Optional[List[Dict]] = []
 
 
 class RiskScoreResponse(BaseModel):
@@ -74,6 +77,7 @@ class RiskScoreResponse(BaseModel):
     remediation_steps: List[str]
     scan_coverage: Dict
     analysis_timestamp: str
+    actionable_recommendations: Optional[List[Dict]] = []
 
 
 @router.post("/health-prediction/{deployment_id}", response_model=HealthPredictionResponse)
@@ -155,6 +159,7 @@ async def recommend_scaling(
 
     Provides detailed cost impact analysis and performance estimates.
     """
+
     advisor = AutoScalingAdvisor(db)
 
     try:
@@ -163,9 +168,11 @@ async def recommend_scaling(
             hours_lookback=hours_lookback
         )
 
-        return ScalingRecommendationResponse(**result)
+        response = ScalingRecommendationResponse(**result)
+        return response
 
     except Exception as e:
+        import traceback
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Scaling recommendation failed: {str(e)}"
@@ -186,6 +193,7 @@ async def analyze_costs(
 
     Provides optimization recommendations to reduce cloud spending.
     """
+
     analyzer = CostAnalyzer(db)
     user_id = current_user.get("id", 0)
 
@@ -195,9 +203,11 @@ async def analyze_costs(
             months_lookback=months_lookback
         )
 
-        return CostAnalysisResponse(**result)
+        response = CostAnalysisResponse(**result)
+        return response
 
     except Exception as e:
+        import traceback
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Cost analysis failed: {str(e)}"
@@ -218,14 +228,17 @@ async def calculate_risk_score(
 
     Provides specific risk factors and remediation steps.
     """
+
     scorer = SecurityRiskScorer(db)
 
     try:
         result = await scorer.calculate_risk_score(deployment_id=deployment_id)
 
-        return RiskScoreResponse(**result)
+        response = RiskScoreResponse(**result)
+        return response
 
     except Exception as e:
+        import traceback
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Risk scoring failed: {str(e)}"

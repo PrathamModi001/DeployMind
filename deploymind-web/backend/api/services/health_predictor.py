@@ -45,7 +45,7 @@ class HealthPredictor:
         if CORE_AVAILABLE and CoreSettings and GroqClient:
             try:
                 settings = CoreSettings.load()
-                self.llm = GroqClient(settings)
+                self.llm = GroqClient(settings.groq_api_key)
                 logger.info("HealthPredictor initialized with LLM")
             except Exception as e:
                 logger.warning(f"Failed to initialize LLM: {e}")
@@ -195,10 +195,9 @@ class HealthPredictor:
         """
 
         try:
-            response = await self.llm.complete(
-                prompt=prompt,
+            response = self.llm.chat_completion(
                 model="llama-3.1-70b-versatile",
-                max_tokens=500
+                messages=[{"role": "user", "content": prompt}]
             )
 
             # Parse LLM response

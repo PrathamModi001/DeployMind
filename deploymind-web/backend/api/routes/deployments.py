@@ -199,6 +199,84 @@ async def rollback_deployment(
     return _deployment_to_response(updated_deployment)
 
 
+@router.delete("/{deployment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_deployment(
+    deployment_id: str,
+    current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Delete a deployment and all related records.
+
+    WARNING: This is a destructive operation that cannot be undone.
+    Deletes:
+    - Deployment record
+    - Related security scans
+    - Build results
+    - Health checks
+    - Deployment logs
+    - Agent executions
+
+    Args:
+        deployment_id: ID of deployment to delete
+        current_user: Authenticated user
+        db: Database session
+
+    Raises:
+        404: Deployment not found
+        500: Deletion failed
+    """
+    from ..services.database import (
+        Deployment,
+        SecurityScan,
+        BuildResult,
+        HealthCheck,
+        DeploymentLog,
+        AgentExecution
+    )
+
+    # Check deployment exists
+    deployment = db.query(Deployment).filter(Deployment.id == deployment_id).first()
+
+    if not deployment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Deployment {deployment_id} not found"
+        )
+
+    try:
+        # Delete related records (cascade deletion)
+        # Order matters: delete child records first
+        if SecurityScan:
+            db.query(SecurityScan).filter(SecurityScan.deployment_id == deployment_id).delete()
+
+        if BuildResult:
+            db.query(BuildResult).filter(BuildResult.deployment_id == deployment_id).delete()
+
+        if HealthCheck:
+            db.query(HealthCheck).filter(HealthCheck.deployment_id == deployment_id).delete()
+
+        if DeploymentLog:
+            db.query(DeploymentLog).filter(DeploymentLog.deployment_id == deployment_id).delete()
+
+        if AgentExecution:
+            db.query(AgentExecution).filter(AgentExecution.deployment_id == deployment_id).delete()
+
+        # Delete the deployment itself
+        db.delete(deployment)
+        db.commit()
+
+        # Note: 204 No Content returns no body
+        return None
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete deployment: {str(e)}"
+        )
+
+
 def _deployment_to_response(deployment) -> DeploymentResponse:
     """Convert database Deployment model to API response schema."""
     # Extract port and environment from extra_data JSON field

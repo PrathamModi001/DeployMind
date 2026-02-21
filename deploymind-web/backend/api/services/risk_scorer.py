@@ -60,7 +60,7 @@ class SecurityRiskScorer:
         if CORE_AVAILABLE and CoreSettings and GroqClient:
             try:
                 settings = CoreSettings.load()
-                self.llm = GroqClient(settings)
+                self.llm = GroqClient(settings.groq_api_key)
                 logger.info("SecurityRiskScorer initialized with LLM")
             except Exception as e:
                 logger.warning(f"Failed to initialize LLM: {e}")
@@ -89,7 +89,7 @@ class SecurityRiskScorer:
             # Get latest security scans
             scans = self.db.query(SecurityScan)\
                 .filter(SecurityScan.deployment_id == deployment_id)\
-                .order_by(SecurityScan.created_at.desc())\
+                .order_by(SecurityScan.scan_started_at.desc())\
                 .limit(5)\
                 .all()
 
@@ -104,7 +104,9 @@ class SecurityRiskScorer:
                     "scan_coverage": {
                         "latest_scan": None,
                         "total_scans": 0
-                    }
+                    },
+                    "analysis_timestamp": datetime.utcnow().isoformat(),
+                    "actionable_recommendations": []
                 }
 
             latest_scan = scans[0]
@@ -113,7 +115,7 @@ class SecurityRiskScorer:
             base_score = self._calculate_base_score(latest_scan)
 
             # Adjust for scan age
-            scan_age_days = (datetime.utcnow() - latest_scan.created_at).days
+            scan_age_days = (datetime.utcnow() - latest_scan.scan_started_at).days
             age_penalty = min(scan_age_days * 2, 20)  # Max 20 points penalty
 
             # Final score
@@ -128,7 +130,14 @@ class SecurityRiskScorer:
             else:
                 analysis = self._rule_based_analysis(latest_scan, risk_score)
 
-            return {
+            # Create actionable recommendations
+            actionable_recs = self._create_actionable_recommendations(
+                deployment_id,
+                scan_age_days,
+                latest_scan
+            )
+
+            result = {
                 "deployment_id": deployment_id,
                 "risk_score": round(risk_score, 1),
                 "rating": rating,
@@ -136,7 +145,7 @@ class SecurityRiskScorer:
                 "risk_factors": analysis["risk_factors"],
                 "remediation_steps": analysis["remediation_steps"],
                 "scan_coverage": {
-                    "latest_scan": latest_scan.created_at.isoformat(),
+                    "latest_scan": latest_scan.scan_started_at.isoformat(),
                     "scan_age_days": scan_age_days,
                     "total_scans": len(scans),
                     "vulnerabilities": {
@@ -146,12 +155,73 @@ class SecurityRiskScorer:
                         "low": latest_scan.low_count or 0
                     }
                 },
-                "analysis_timestamp": datetime.utcnow().isoformat()
+                "analysis_timestamp": datetime.utcnow().isoformat(),
+                "actionable_recommendations": actionable_recs
             }
+            return result
 
         except Exception as e:
+            import traceback
             logger.error(f"Risk scoring failed: {e}", exc_info=True)
             return self._mock_risk_score(deployment_id)
+
+    def _create_actionable_recommendations(
+        self,
+        deployment_id: str,
+        scan_age_days: int,
+        latest_scan
+    ) -> List[Dict]:
+        """Create actionable recommendations for security improvements."""
+        import uuid
+
+        recommendations = []
+
+        # Recommend rescan if scan is old (> 7 days)
+        if scan_age_days > 7:
+            recommendations.append({
+                "id": f"scan-{deployment_id}-{uuid.uuid4().hex[:8]}",
+                "action_type": "trigger_security_scan",
+                "title": "Run fresh security scan",
+                "description": f"Security scan is {scan_age_days} days old. Run a new scan to identify recent vulnerabilities.",
+                "parameters": {
+                    "deployment_id": deployment_id,
+                    "scan_type": "full"
+                },
+                "impact": {
+                    "scan_age_days": scan_age_days,
+                    "risk_reduction": "high"
+                },
+                "requires_confirmation": False,
+                "confirmation_message": "",
+                "confidence": "high",
+                "estimated_duration_minutes": 5,
+                "can_undo": False
+            })
+
+        # Recommend immediate scan if critical vulnerabilities exist
+        critical_count = getattr(latest_scan, 'critical_count', 0) or 0
+        if critical_count > 0:
+            recommendations.append({
+                "id": f"scan-critical-{deployment_id}-{uuid.uuid4().hex[:8]}",
+                "action_type": "trigger_security_scan",
+                "title": "Re-scan after fixing critical issues",
+                "description": f"Verify that {critical_count} critical vulnerabilities have been patched.",
+                "parameters": {
+                    "deployment_id": deployment_id,
+                    "scan_type": "full"
+                },
+                "impact": {
+                    "critical_vulnerabilities": critical_count,
+                    "risk_reduction": "critical"
+                },
+                "requires_confirmation": False,
+                "confirmation_message": "",
+                "confidence": "high",
+                "estimated_duration_minutes": 5,
+                "can_undo": False
+            })
+
+        return recommendations
 
     def _calculate_base_score(self, scan) -> float:
         """Calculate base risk score from vulnerability counts."""
@@ -214,7 +284,7 @@ class SecurityRiskScorer:
         - High: {getattr(scan, 'high_count', 0)}
         - Medium: {getattr(scan, 'medium_count', 0)}
         - Low: {getattr(scan, 'low_count', 0)}
-        - Scan age: {(datetime.utcnow() - scan.created_at).days} days
+        - Scan age: {(datetime.utcnow() - scan.scan_started_at).days} days
 
         Top Vulnerabilities:
         {vulns_str}
@@ -231,10 +301,9 @@ class SecurityRiskScorer:
         """
 
         try:
-            response = await self.llm.complete(
-                prompt=prompt,
+            response = self.llm.chat_completion(
                 model="llama-3.1-70b-versatile",
-                max_tokens=400
+                messages=[{"role": "user", "content": prompt}]
             )
 
             import json
@@ -257,7 +326,7 @@ class SecurityRiskScorer:
         critical = getattr(scan, 'critical_count', 0) or 0
         high = getattr(scan, 'high_count', 0) or 0
         medium = getattr(scan, 'medium_count', 0) or 0
-        scan_age = (datetime.utcnow() - scan.created_at).days
+        scan_age = (datetime.utcnow() - scan.scan_started_at).days
 
         # Identify risk factors
         if critical > 0:
@@ -298,6 +367,28 @@ class SecurityRiskScorer:
 
     def _mock_risk_score(self, deployment_id: str) -> Dict:
         """Return mock risk score."""
+        import uuid
+
+        mock_rec = {
+            "id": f"scan-{deployment_id}-{uuid.uuid4().hex[:8]}",
+            "action_type": "trigger_security_scan",
+            "title": "Run fresh security scan",
+            "description": "Security scan is 8 days old. Run a new scan to identify recent vulnerabilities.",
+            "parameters": {
+                "deployment_id": deployment_id,
+                "scan_type": "full"
+            },
+            "impact": {
+                "scan_age_days": 8,
+                "risk_reduction": "high"
+            },
+            "requires_confirmation": False,
+            "confirmation_message": "",
+            "confidence": "high",
+            "estimated_duration_minutes": 5,
+            "can_undo": False
+        }
+
         return {
             "deployment_id": deployment_id,
             "risk_score": 45.5,
@@ -305,7 +396,7 @@ class SecurityRiskScorer:
             "confidence": "high",
             "risk_factors": [
                 "2 HIGH severity vulnerabilities detected",
-                "Security scan is 5 days old",
+                "Security scan is 8 days old",
                 "Accumulation of 8 medium-severity issues"
             ],
             "remediation_steps": [
@@ -315,7 +406,7 @@ class SecurityRiskScorer:
             ],
             "scan_coverage": {
                 "latest_scan": datetime.utcnow().isoformat(),
-                "scan_age_days": 5,
+                "scan_age_days": 8,
                 "total_scans": 3,
                 "vulnerabilities": {
                     "critical": 0,
@@ -324,5 +415,6 @@ class SecurityRiskScorer:
                     "low": 15
                 }
             },
-            "analysis_timestamp": datetime.utcnow().isoformat()
+            "analysis_timestamp": datetime.utcnow().isoformat(),
+            "actionable_recommendations": [mock_rec]
         }

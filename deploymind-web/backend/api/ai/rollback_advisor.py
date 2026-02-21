@@ -18,7 +18,9 @@ class RollbackAdvisor:
         """Initialize advisor with Groq client."""
         try:
             from deploymind.infrastructure.llm.groq.groq_client import GroqClient
-            self.llm = GroqClient()
+            from deploymind.config.settings import Settings as CoreSettings
+            settings = CoreSettings.load()
+            self.llm = GroqClient(settings.groq_api_key)
             self.llm_available = True
         except (ImportError, Exception) as e:
             logger.warning(f"Groq LLM not available: {e}")
@@ -76,9 +78,9 @@ Return ONLY a JSON object:
 }}"""
 
         try:
-            response = await self.llm.complete(
-                prompt=prompt,
-                model="llama-3.1-70b-versatile"
+            response = self.llm.chat_completion(
+                model="llama-3.1-70b-versatile",
+                messages=[{"role": "user", "content": prompt}]
             )
             return json.loads(response)
 

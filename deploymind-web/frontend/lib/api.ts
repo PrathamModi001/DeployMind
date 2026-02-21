@@ -67,6 +67,8 @@ export const api = {
       apiClient.get(`/api/deployments/${id}/logs`),
     rollback: (id: string) =>
       apiClient.post(`/api/deployments/${id}/rollback`),
+    delete: (id: string) =>
+      apiClient.delete(`/api/deployments/${id}`),
     // Environment variables
     listEnvVars: (id: string) =>
       apiClient.get(`/api/deployments/${id}/env`),
@@ -136,5 +138,17 @@ export const api = {
       apiClient.get(`/api/github/repositories/${owner}/${repo}/detect`),
     getLatestCommit: (owner: string, repo: string, branch: string = 'main') =>
       apiClient.get(`/api/github/repositories/${owner}/${repo}/commit`, { params: { branch } }),
+  },
+
+  // AI Actions (Actionable Recommendations)
+  aiActions: {
+    executeScaleInstance: (data: { recommendation_id: string; parameters: any; confirmed: boolean }) =>
+      apiClient.post('/api/ai/actions/execute/scale-instance', data),
+    executeStopIdleDeployments: (data: { recommendation_id: string; parameters: any; confirmed: boolean }) =>
+      apiClient.post('/api/ai/actions/execute/stop-idle-deployments', data),
+    executeTriggerSecurityScan: (data: { recommendation_id: string; parameters: any; confirmed: boolean }) =>
+      apiClient.post('/api/ai/actions/execute/trigger-security-scan', data),
+    getExecutionStatus: (executionId: string) =>
+      apiClient.get(`/api/ai/actions/status/${executionId}`),
   },
 };
