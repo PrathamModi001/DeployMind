@@ -142,6 +142,54 @@ def optimize_docker_image(dockerfile_content: str) -> str:
         return f"Optimization analysis failed: {e}"
 
 
+from dataclasses import dataclass, field
+from typing import List
+
+
+@dataclass
+class BuildAgentResult:
+    """Result from BuildAgent.analyze_and_build()."""
+    success: bool = True
+    language: str = "unknown"
+    dockerfile_generated: bool = False
+    image_tag: str = ""
+    recommendations: List[str] = field(default_factory=list)
+    message: str = ""
+
+
+class BuildAgent:
+    """Thin wrapper around the build tools for direct (non-CrewAI) use."""
+
+    def __init__(self, groq_api_key: str):
+        self.groq_api_key = groq_api_key
+
+    def analyze_and_build(self, project_path: str) -> BuildAgentResult:
+        """Detect language, generate Dockerfile if missing, return analysis."""
+        try:
+            from deploymind.infrastructure.build.language_detector import LanguageDetector
+            from deploymind.infrastructure.build.dockerfile_optimizer import DockerfileOptimizer
+
+            detection = LanguageDetector().detect(project_path)
+            optimizer = DockerfileOptimizer()
+            recs = []
+
+            from pathlib import Path
+            dockerfile = Path(project_path) / "Dockerfile"
+            if dockerfile.exists():
+                findings = optimizer.analyze(dockerfile.read_text(encoding="utf-8"))
+                recs = [f.suggestion for f in findings]
+
+            return BuildAgentResult(
+                success=True,
+                language=detection.language if detection else "unknown",
+                dockerfile_generated=not dockerfile.exists(),
+                recommendations=recs,
+                message=f"Analysis complete for {detection.language if detection else 'unknown'} project"
+            )
+        except Exception as e:
+            return BuildAgentResult(success=False, message=str(e))
+
+
 def create_build_agent(llm: str = "groq/llama-3.1-70b-versatile") -> Agent:
     """Create the Build Agent with its tools.
 

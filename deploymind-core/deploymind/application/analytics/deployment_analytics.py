@@ -9,7 +9,7 @@ from typing import List, Dict, Optional, Any
 from collections import defaultdict
 
 from deploymind.config.dependencies import container
-from core.logger import get_logger
+from deploymind.shared.secure_logging import get_logger
 from deploymind.shared.cache import cached
 
 logger = get_logger(__name__)

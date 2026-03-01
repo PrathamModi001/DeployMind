@@ -10,10 +10,11 @@ from pathlib import Path
 
 from deploymind.config.settings import Settings
 from deploymind.config.logging import get_logger
-from deploymind.infrastructure.build.language_detector import LanguageDetector, ProjectInfo
+from deploymind.infrastructure.build.language_detector import LanguageDetector, DetectionResult as ProjectInfo
+from deploymind.infrastructure.build.dockerfile_generator import DockerfileGenerator
 from deploymind.infrastructure.build.dockerfile_optimizer import DockerfileOptimizer
 from deploymind.infrastructure.build.docker_builder import DockerBuilder, BuildResult
-from deploymind.agents.build.build_agent import BuildAgent, BuildAgentResult
+from deploymind.agents.build_agent import BuildAgent, BuildAgentResult
 
 logger = get_logger(__name__)
 
@@ -60,6 +61,7 @@ class BuildApplicationUseCase:
         """
         self.settings = settings
         self.language_detector = LanguageDetector()
+        self.dockerfile_generator = DockerfileGenerator()
         self.dockerfile_optimizer = DockerfileOptimizer()
         self.docker_builder = DockerBuilder()
         self.build_agent = BuildAgent(settings.groq_api_key)
@@ -106,11 +108,8 @@ class BuildApplicationUseCase:
 
             if not dockerfile_path.exists():
                 logger.info("Dockerfile not found, generating optimized Dockerfile")
-                dockerfile_content = self.dockerfile_optimizer.optimize(
-                    project_path=str(project_path),
-                    project_info=project_info,
-                    existing_dockerfile=None
-                )
+                generated = self.dockerfile_generator.generate(project_info)
+                dockerfile_content = generated.content
                 logger.info("Dockerfile generated successfully")
             else:
                 logger.info("Dockerfile exists, reading existing file")
@@ -129,11 +128,16 @@ class BuildApplicationUseCase:
                 timestamp = int(time.time())
                 image_tag = f"deploymind-{project_info.language}-{timestamp}"
 
+            # Write dockerfile content to disk so DockerBuilder can use it
+            import tempfile
+            dockerfile_tmp = project_path / "Dockerfile"
+            if not dockerfile_tmp.exists():
+                dockerfile_tmp.write_text(dockerfile_content, encoding="utf-8")
+
             build_result = self.docker_builder.build(
+                image_tag=image_tag,
+                dockerfile_path=str(dockerfile_tmp),
                 context_path=str(project_path),
-                project_info=project_info,
-                dockerfile_content=dockerfile_content,
-                tag=image_tag
             )
 
             if not build_result.success:
@@ -144,7 +148,7 @@ class BuildApplicationUseCase:
                 extra={
                     "image_id": build_result.image_id,
                     "tag": image_tag,
-                    "build_time": build_result.build_time_seconds
+                    "build_time": build_result.duration_seconds
                 }
             )
 
@@ -176,7 +180,7 @@ class BuildApplicationUseCase:
                 ai_analysis=ai_analysis,
                 message=(
                     f"✅ Successfully built {project_info.language} application. "
-                    f"Image: {image_tag}, Build time: {build_result.build_time_seconds:.1f}s"
+                    f"Image: {image_tag}, Build time: {build_result.duration_seconds:.1f}s"
                 )
             )
 

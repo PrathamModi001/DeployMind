@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 # Add deploymind-core to Python path to import its models
-core_path = Path(__file__).parent.parent.parent.parent / "deploymind-core"
+core_path = Path(__file__).parent.parent.parent.parent.parent / "deploymind-core"
 sys.path.insert(0, str(core_path))
 
 # Import deploymind-core database models

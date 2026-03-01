@@ -122,7 +122,7 @@ class TestOWASPCompliance:
     def test_sensitive_data_exposure_prevention(self):
         """Test sensitive data is properly protected."""
         # Test that logging doesn't expose secrets
-        from core.logger import get_logger
+        from deploymind.shared.secure_logging import get_logger
 
         logger = get_logger("test_security")
 
@@ -381,7 +381,7 @@ class TestSecretManagement:
 
     def test_secrets_not_in_logs(self):
         """Test that secrets are not logged in plain text."""
-        from core.logger import get_logger
+        from deploymind.shared.secure_logging import get_logger
 
         logger = get_logger("test_secrets")
 

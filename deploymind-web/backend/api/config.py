@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # Database
-    database_url: str = "postgresql://admin:password@localhost:5432/deploymind"
+    database_url: str = "postgresql://admin:password@localhost:5433/deploymind"
 
     # Redis
     redis_url: str = "redis://localhost:6379"
@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"
 
 
 settings = Settings()

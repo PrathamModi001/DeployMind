@@ -12,7 +12,7 @@ from typing import Optional, Dict, Any
 import yaml
 from dataclasses import dataclass, field
 
-from core.logger import get_logger
+from deploymind.shared.secure_logging import get_logger
 
 logger = get_logger(__name__)
 

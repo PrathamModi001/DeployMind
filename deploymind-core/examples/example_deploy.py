@@ -15,8 +15,8 @@ Usage:
   python -m examples.example_deploy
 """
 
-from core.config import Config
-from core.logger import get_logger
+from deploymind.config.settings import Settings as Config
+from deploymind.shared.secure_logging import get_logger
 from agents.orchestrator import create_deployment_crew
 
 logger = get_logger(__name__)

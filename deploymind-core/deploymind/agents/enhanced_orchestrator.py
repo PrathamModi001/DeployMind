@@ -22,7 +22,7 @@ from deploymind.application.use_cases.full_deployment_workflow import (
 from deploymind.infrastructure.cache.redis_client import RedisClient
 from deploymind.shared.validators import SecurityValidator
 from deploymind.shared.exceptions import ValidationError, DeploymentError
-from core.logger import get_logger
+from deploymind.shared.secure_logging import get_logger
 
 logger = get_logger(__name__)
 

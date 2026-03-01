@@ -24,7 +24,7 @@ from deploymind.domain.entities.deployment import Deployment
 from deploymind.shared.validators import SecurityValidator
 from deploymind.shared.exceptions import ValidationError, SecurityScanError, BuildError, DeploymentError
 from deploymind.shared.cleanup import get_cleanup_manager
-from core.logger import get_logger
+from deploymind.shared.secure_logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -281,9 +281,10 @@ class FullDeploymentWorkflow:
             except Exception as e:
                 logger.warning("Failed to update deployment status", extra={"error": str(e)})
 
-            # Generate Dockerfile for building on instance
-            import os
-            # Don't read from clone (may be outdated), generate a fresh one for FastAPI
+            # Generate Dockerfile for building on instance.
+            # NOTE: This Dockerfile must NOT use COPY requirements.txt because
+            # the target repo (DeployMind monorepo) has no root-level requirements.txt.
+            # Install fastapi+uvicorn directly so it works with any repo structure.
             dockerfile_content = """FROM python:3.11-slim
 
 # Set working directory
@@ -295,11 +296,8 @@ RUN apt-get update && apt-get install -y \\
     curl \\
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
-COPY requirements.txt .
-
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies directly (no requirements.txt needed)
+RUN pip install --no-cache-dir fastapi uvicorn
 
 # Copy application code
 COPY . .

@@ -6,7 +6,7 @@ from typing import Callable, Type, Tuple, Optional
 from datetime import datetime, timedelta
 from enum import Enum
 
-from core.logger import get_logger
+from deploymind.shared.secure_logging import get_logger
 
 logger = get_logger(__name__)
 

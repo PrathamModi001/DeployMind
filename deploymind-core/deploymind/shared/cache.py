@@ -6,7 +6,7 @@ from typing import Callable, Any, Optional
 from datetime import timedelta
 import hashlib
 
-from core.logger import get_logger
+from deploymind.shared.secure_logging import get_logger
 
 logger = get_logger(__name__)
 
