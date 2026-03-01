@@ -1,5 +1,7 @@
 """Tests for monitoring endpoints."""
 import pytest
+import sys
+from pathlib import Path
 from fastapi.testclient import TestClient
 
 from api.main import app
@@ -9,6 +11,17 @@ from api.utils.jwt import create_access_token
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+
+# Add deploymind-core to path (5 parents from tests/)
+core_path = Path(__file__).parent.parent.parent.parent.parent / "deploymind-core"
+sys.path.insert(0, str(core_path))
+
+try:
+    from deploymind.infrastructure.database.connection import Base as CoreBase
+    CORE_AVAILABLE = True
+except ImportError:
+    CoreBase = None
+    CORE_AVAILABLE = False
 
 # In-memory SQLite for testing
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
@@ -20,8 +33,11 @@ engine = create_engine(
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Create tables
-User.__table__.create(bind=engine, checkfirst=True)
+# Create all tables (including core tables like deployments)
+if CORE_AVAILABLE and CoreBase:
+    CoreBase.metadata.create_all(bind=engine)
+else:
+    User.__table__.create(bind=engine, checkfirst=True)
 
 
 def override_get_db():
@@ -33,8 +49,15 @@ def override_get_db():
         db.close()
 
 
-app.dependency_overrides[get_db] = override_get_db
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def setup_db_override():
+    """Ensure this file's DB override is active for every test in this file."""
+    app.dependency_overrides[get_db] = override_get_db
+    yield
+    app.dependency_overrides.pop(get_db, None)
 
 
 @pytest.fixture

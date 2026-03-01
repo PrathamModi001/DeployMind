@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 # Import deploymind-core models
-core_path = Path(__file__).parent.parent.parent.parent / "deploymind-core"
+core_path = Path(__file__).parent.parent.parent.parent.parent / "deploymind-core"
 sys.path.insert(0, str(core_path))
 
 try:

@@ -17,7 +17,7 @@ from api.models.user import User
 from api.utils.jwt import create_access_token
 
 # Add deploymind-core to path
-core_path = Path(__file__).parent.parent.parent.parent / "deploymind-core"
+core_path = Path(__file__).parent.parent.parent.parent.parent / "deploymind-core"
 sys.path.insert(0, str(core_path))
 
 try:
@@ -70,8 +70,15 @@ def override_get_db():
         db.close()
 
 
-app.dependency_overrides[get_db] = override_get_db
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def setup_db_override():
+    """Ensure this file's DB override is active for every test in this file."""
+    app.dependency_overrides[get_db] = override_get_db
+    yield
+    app.dependency_overrides.pop(get_db, None)
 
 
 @pytest.fixture
@@ -380,17 +387,31 @@ class TestRollbackDeployment:
     """Test deployment rollback endpoint."""
 
     def test_rollback_deployment_success(self, auth_headers):
-        """Test rolling back a deployment."""
+        """Test rolling back a deployment — needs a previous deployment with image_tag."""
         db = TestingSessionLocal()
 
-        deployment = Deployment(
+        # Previous deployment (to roll back TO)
+        previous = Deployment(
+            id="test-deploy-0",
+            repository="owner/repo",
+            instance_id="i-0123456789abcdef0",
+            status=DeploymentStatusEnum.DEPLOYED,
+            strategy=DeploymentStrategyEnum.ROLLING,
+            image_tag="owner-repo:abc111",
+        )
+        db.add(previous)
+
+        # Current deployment (the one being rolled back)
+        current = Deployment(
             id="test-deploy-1",
             repository="owner/repo",
             instance_id="i-0123456789abcdef0",
             status=DeploymentStatusEnum.DEPLOYED,
             strategy=DeploymentStrategyEnum.ROLLING,
+            image_tag="owner-repo:abc222",
+            extra_data={"port": 8080, "environment": "production"},
         )
-        db.add(deployment)
+        db.add(current)
         db.commit()
         db.close()
 
@@ -402,7 +423,33 @@ class TestRollbackDeployment:
         assert response.status_code == 200
         data = response.json()
         assert data["id"] == "test-deploy-1"
-        assert data["status"] == "ROLLED_BACK"
+        # Rollback sets status to "rolling_back" → maps to DEPLOYING in API response
+        assert data["status"] == "DEPLOYING"
+
+    def test_rollback_no_previous_deployment(self, auth_headers):
+        """Test rollback when no previous deployment exists → 409 Conflict."""
+        db = TestingSessionLocal()
+
+        # Only one deployment, no previous to roll back to
+        deployment = Deployment(
+            id="test-deploy-only",
+            repository="owner/repo",
+            instance_id="i-0123456789abcdef0",
+            status=DeploymentStatusEnum.DEPLOYED,
+            strategy=DeploymentStrategyEnum.ROLLING,
+            image_tag=None,  # No image tag
+        )
+        db.add(deployment)
+        db.commit()
+        db.close()
+
+        response = client.post(
+            "/api/deployments/test-deploy-only/rollback",
+            headers=auth_headers
+        )
+
+        assert response.status_code == 409
+        assert "No previous deployment" in response.json()["detail"]
 
     def test_rollback_nonexistent_deployment(self, auth_headers):
         """Test rolling back a non-existent deployment."""

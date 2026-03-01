@@ -5,7 +5,7 @@ from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from sqlalchemy.sql import func
 
 # Import Base from deploymind-core to share metadata
-core_path = Path(__file__).parent.parent.parent.parent / "deploymind-core"
+core_path = Path(__file__).parent.parent.parent.parent.parent / "deploymind-core"
 sys.path.insert(0, str(core_path))
 
 try:
