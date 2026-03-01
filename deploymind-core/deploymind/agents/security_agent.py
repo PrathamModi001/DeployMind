@@ -3,7 +3,7 @@
 from crewai import Agent
 from crewai.tools import tool
 
-from core.logger import get_logger
+from deploymind.shared.secure_logging import get_logger
 
 logger = get_logger(__name__)
 

@@ -4,19 +4,18 @@ import os
 
 import pytest
 
-from core.config import Config
-
 
 @pytest.fixture(autouse=True)
 def mock_api_keys(monkeypatch):
     """Set dummy API keys so CrewAI agents can be instantiated in tests."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-key")
+    monkeypatch.setenv("GROQ_API_KEY", "test-groq-key")
 
 
 @pytest.fixture
 def config():
     """Provide a test configuration with dummy values."""
-    from config.settings import Settings
+    from deploymind.config.settings import Settings
     return Settings(
         groq_api_key="test-groq-key",
         aws_access_key_id="AKIATEST",

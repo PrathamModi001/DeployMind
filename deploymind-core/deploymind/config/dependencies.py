@@ -13,6 +13,8 @@ from deploymind.infrastructure.database.repositories.deployment_repo_impl import
 from deploymind.infrastructure.database.repositories.security_scan_repo_impl import SecurityScanRepositoryImpl
 from deploymind.infrastructure.database.repositories.build_result_repo_impl import BuildResultRepositoryImpl
 from deploymind.infrastructure.database.repositories.health_check_repo_impl import HealthCheckRepositoryImpl
+from deploymind.infrastructure.queue.deployment_queue import DeploymentQueue
+from deploymind.infrastructure.queue.distributed_lock import DistributedLock
 
 
 class DependencyContainer:
@@ -35,6 +37,13 @@ class DependencyContainer:
         self.security_scan_repo = SecurityScanRepositoryImpl()
         self.build_result_repo = BuildResultRepositoryImpl()
         self.health_check_repo = HealthCheckRepositoryImpl()
+
+        # Infrastructure layer - Queue & distributed coordination
+        self.deployment_queue = DeploymentQueue(self.redis_client.client)
+        self.deploy_lock = DistributedLock(
+            self.redis_client.client,
+            lock_name="deploymind:global-deploy-lock",
+        )
 
     def validate_all(self) -> bool:
         """Validate all external service connections.

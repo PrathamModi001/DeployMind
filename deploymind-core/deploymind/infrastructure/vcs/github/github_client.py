@@ -147,3 +147,91 @@ class GitHubClient:
         except GithubException as e:
             logger.error(f"Failed to get file {file_path}: {e}")
             raise
+
+    def post_deployment_status(
+        self,
+        repo_full_name: str,
+        commit_sha: str,
+        state: str,
+        description: str,
+        context: str = "deploymind/deployment",
+        target_url: str = "",
+    ) -> None:
+        """Post a commit status check to GitHub.
+
+        Args:
+            repo_full_name: Repository in format "owner/repo"
+            commit_sha: Full commit SHA to update
+            state: One of "pending", "success", "failure", "error"
+            description: Short human-readable description (max 140 chars)
+            context: Status context identifier (defaults to deploymind/deployment)
+            target_url: Optional URL to link from the status (e.g. build logs)
+        """
+        _VALID_STATES = {"pending", "success", "failure", "error"}
+        if state not in _VALID_STATES:
+            raise ValueError(f"state must be one of {_VALID_STATES}, got {state!r}")
+
+        repo = self.get_repository(repo_full_name)
+        commit = repo.get_commit(commit_sha)
+        kwargs: dict = dict(
+            state=state,
+            description=description[:140],  # GitHub limit
+            context=context,
+        )
+        if target_url:
+            kwargs["target_url"] = target_url
+
+        try:
+            commit.create_status(**kwargs)
+            logger.info(
+                "Posted commit status",
+                extra={"repo": repo_full_name, "sha": commit_sha[:7], "state": state},
+            )
+        except GithubException as e:
+            logger.error(f"Failed to post commit status: {e}")
+            raise
+
+    def create_pr_comment(
+        self,
+        repo_full_name: str,
+        pr_number: int,
+        body: str,
+    ) -> None:
+        """Add a comment to a pull request.
+
+        Args:
+            repo_full_name: Repository in format "owner/repo"
+            pr_number: Pull request number
+            body: Markdown-formatted comment body
+        """
+        repo = self.get_repository(repo_full_name)
+        try:
+            pr = repo.get_pull(pr_number)
+            pr.create_issue_comment(body)
+            logger.info(
+                "Created PR comment",
+                extra={"repo": repo_full_name, "pr": pr_number},
+            )
+        except GithubException as e:
+            logger.error(f"Failed to create PR comment: {e}")
+            raise
+
+    def get_pr_for_branch(self, repo_full_name: str, branch: str) -> int | None:
+        """Find the open pull request number for a given head branch.
+
+        Args:
+            repo_full_name: Repository in format "owner/repo"
+            branch: Head branch name (e.g. "feature/my-feature")
+
+        Returns:
+            PR number if an open PR exists for that branch, otherwise None.
+        """
+        repo = self.get_repository(repo_full_name)
+        try:
+            pulls = repo.get_pulls(state="open", head=f"{repo.owner.login}:{branch}")
+            for pr in pulls:
+                return pr.number  # Return first matching open PR
+            return None
+        except GithubException as e:
+            logger.error(f"Failed to look up PR for branch {branch}: {e}")
+            raise

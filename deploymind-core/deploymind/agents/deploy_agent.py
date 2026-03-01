@@ -292,7 +292,7 @@ def check_deployment_status(instance_id: str, container_name: str = "app") -> st
         return f"✗ Status check failed: {str(e)}"
 
 
-def create_deploy_agent(groq_api_key: str) -> Agent:
+def create_deploy_agent(groq_api_key: str, llm: str = "groq/llama-3.1-70b-versatile") -> Agent:
     """Create the Deploy Agent with its tools.
 
     The Deploy Agent is responsible for:
@@ -302,14 +302,14 @@ def create_deploy_agent(groq_api_key: str) -> Agent:
     - Deployment status reporting
 
     Args:
-        groq_api_key: Groq API key for LLM
+        groq_api_key: Groq API key for LLM (set as env var for LiteLLM)
+        llm: LiteLLM-compatible model string (default: groq/llama-3.1-70b-versatile)
 
     Returns:
         CrewAI Agent configured for deployment operations
     """
-    from groq import Groq
-
-    llm = Groq(api_key=groq_api_key, model="llama-3.1-70b-versatile")
+    import os
+    os.environ["GROQ_API_KEY"] = groq_api_key
 
     return Agent(
         role="Deployment Specialist",
