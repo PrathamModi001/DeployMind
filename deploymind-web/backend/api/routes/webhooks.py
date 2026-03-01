@@ -1,9 +1,10 @@
 """GitHub webhooks for auto-deploy."""
-from fastapi import APIRouter, Request, HTTPException, Depends
+from fastapi import APIRouter, Request, HTTPException, BackgroundTasks, Depends
 from sqlalchemy.orm import Session
 from typing import Dict
 import hmac
 import hashlib
+import uuid
 
 from ..services.database import get_db
 from ..config import settings
@@ -16,11 +17,8 @@ def verify_github_signature(payload: bytes, signature: str) -> bool:
     Verify GitHub webhook signature.
 
     GitHub sends a signature in the X-Hub-Signature-256 header.
+    Requires settings.github_webhook_secret to be set.
     """
-    if not settings.github_webhook_secret:
-        # If no secret configured, skip verification (dev mode)
-        return True
-
     if not signature:
         return False
 
@@ -43,6 +41,7 @@ def verify_github_signature(payload: bytes, signature: str) -> bool:
 @router.post("/github")
 async def github_webhook(
     request: Request,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     """
@@ -53,9 +52,14 @@ async def github_webhook(
     - pull_request: Optionally deploy preview environments
 
     Security:
+    - Requires webhook secret (GITHUB_WEBHOOK_SECRET env var must be set)
     - Validates webhook signature (HMAC SHA-256)
     - Only processes whitelisted repositories
     """
+    # Require webhook secret to be configured
+    if not settings.github_webhook_secret:
+        raise HTTPException(status_code=401, detail="Webhook secret not configured")
+
     # Get signature from header
     signature = request.headers.get("X-Hub-Signature-256", "")
 
@@ -77,7 +81,7 @@ async def github_webhook(
         return {"message": "Webhook configured successfully"}
 
     if event_type == "push":
-        return await handle_push_event(payload, db)
+        return await handle_push_event(payload, db, background_tasks)
 
     if event_type == "pull_request":
         return await handle_pull_request_event(payload, db)
@@ -86,18 +90,20 @@ async def github_webhook(
     return {"message": f"Event '{event_type}' received but not processed"}
 
 
-async def handle_push_event(payload: Dict, db: Session) -> Dict:
+async def handle_push_event(payload: Dict, db: Session, background_tasks: BackgroundTasks) -> Dict:
     """
     Handle GitHub push event.
 
     Auto-deploy if:
-    1. Deployment exists for this repository
-    2. Auto-deploy is enabled
-    3. Push is to main/master branch
+    1. A DEPLOYED deployment exists for this repository
+    2. Push is to main/master branch
     """
-    repo = payload.get("repository", {}).get("full_name")
+    from ..services.database import Deployment as DeploymentModel
+    from ..services.deployment_service import DeploymentService
+
+    repo_name = payload.get("repository", {}).get("full_name")
     ref = payload.get("ref", "")
-    commit_sha = payload.get("after")
+    commit_sha = payload.get("after", "")
     branch = ref.split("/")[-1] if ref.startswith("refs/heads/") else ""
 
     # Only deploy from main/master branch
@@ -107,19 +113,60 @@ async def handle_push_event(payload: Dict, db: Session) -> Dict:
             "auto_deploy": False
         }
 
-    # In production, this would:
-    # 1. Query database for deployments with this repository
-    # 2. Check if auto_deploy_enabled flag is set
-    # 3. Trigger deployment workflow in background
+    if not repo_name:
+        return {"message": "Missing repository name in payload", "auto_deploy": False}
 
-    # Mock response
+    # Find the most recent deployed deployment for this repo
+    previous = None
+    if DeploymentModel:
+        previous = (
+            db.query(DeploymentModel)
+            .filter(
+                DeploymentModel.repository == repo_name,
+                DeploymentModel.status.in_(["deployed", "DEPLOYED"]),
+            )
+            .order_by(DeploymentModel.created_at.desc())
+            .first()
+        )
+
+    if not previous:
+        return {
+            "message": f"No active deployment found for {repo_name}, skipping auto-deploy",
+            "repository": repo_name,
+            "auto_deploy": False,
+        }
+
+    # Create a new deployment record and fire workflow in background
+    new_deployment_id = f"deploy-{uuid.uuid4().hex[:8]}"
+    service = DeploymentService(db)
+    service.create_deployment(
+        deployment_id=new_deployment_id,
+        repository=repo_name,
+        instance_id=previous.instance_id,
+        user_id=previous.user_id,
+        port=(previous.extra_data or {}).get("port", 8080),
+        strategy=previous.strategy.value if hasattr(previous.strategy, "value") else str(previous.strategy),
+        environment=(previous.extra_data or {}).get("environment", "production"),
+        triggered_by=f"github-push:{branch}",
+    )
+
+    background_tasks.add_task(
+        service.run_deployment_workflow,
+        deployment_id=new_deployment_id,
+        repository=repo_name,
+        instance_id=previous.instance_id,
+        port=(previous.extra_data or {}).get("port", 8080),
+        strategy=previous.strategy.value if hasattr(previous.strategy, "value") else str(previous.strategy),
+        environment=(previous.extra_data or {}).get("environment", "production"),
+    )
+
     return {
-        "message": f"Auto-deploy triggered for {repo}",
-        "repository": repo,
+        "message": f"Auto-deploy triggered for {repo_name}",
+        "repository": repo_name,
         "branch": branch,
-        "commit": commit_sha[:7],
+        "commit": commit_sha[:7] if commit_sha else "unknown",
         "auto_deploy": True,
-        "deployment_id": f"deploy-{commit_sha[:8]}"
+        "deployment_id": new_deployment_id,
     }
 
 

@@ -38,6 +38,7 @@ class FullDeploymentRequest:
     strategy: str = "rolling"
     health_check_path: str = "/health"
     environment: str = "production"
+    deployment_id: Optional[str] = None  # Web can pass its own ID to avoid dual records
 
 
 @dataclass
@@ -125,7 +126,7 @@ class FullDeploymentWorkflow:
             BuildError: If Docker build fails
             DeploymentError: If deployment fails
         """
-        deployment_id = str(uuid.uuid4())[:8]
+        deployment_id = request.deployment_id or str(uuid.uuid4())[:8]
         start_time = datetime.now()
 
         logger.info(

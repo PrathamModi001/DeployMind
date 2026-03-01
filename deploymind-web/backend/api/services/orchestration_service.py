@@ -60,7 +60,8 @@ class OrchestrationService:
         port: int = 8080,
         strategy: str = "rolling",
         health_check_path: str = "/health",
-        environment: str = "production"
+        environment: str = "production",
+        deployment_id: Optional[str] = None,
     ) -> Dict:
         """
         Execute complete deployment workflow.
@@ -86,7 +87,7 @@ class OrchestrationService:
             Dictionary with deployment results
         """
         if not self.workflow:
-            return self._mock_deployment(repository, instance_id)
+            return self._mock_deployment(repository, instance_id, deployment_id)
 
         try:
             # Create request
@@ -96,7 +97,8 @@ class OrchestrationService:
                 port=port,
                 strategy=strategy,
                 health_check_path=health_check_path,
-                environment=environment
+                environment=environment,
+                deployment_id=deployment_id,
             )
 
             # Execute workflow (this is synchronous, run in thread pool)
@@ -118,6 +120,61 @@ class OrchestrationService:
                 "error_message": str(e),
                 "deployment_id": None
             }
+
+    async def rollback_deployment(
+        self,
+        instance_id: str,
+        current_image_tag: str,
+        previous_image_tag: str,
+        port: int = 8080,
+        health_check_path: str = "/health",
+    ) -> Dict:
+        """
+        Roll back a deployment by re-deploying the previous image.
+
+        Args:
+            instance_id: AWS EC2 instance ID
+            current_image_tag: Image tag currently running (for reference)
+            previous_image_tag: Image tag to roll back to
+            port: Application port
+            health_check_path: Health check endpoint
+
+        Returns:
+            Dictionary with rollback result
+        """
+        if not CORE_AVAILABLE:
+            return {"success": False, "error": "Core not available"}
+
+        try:
+            from deploymind.infrastructure.cloud.aws.ec2_client import EC2Client
+            from deploymind.config.settings import Settings as CoreSettings
+
+            settings = CoreSettings.load()
+            ec2_client = EC2Client(settings)
+
+            # Stop the currently running container
+            logger.info(f"Rollback: stopping current container on {instance_id}")
+            ec2_client.stop_container(instance_id, container_name="app")
+
+            # Deploy the previous image
+            logger.info(f"Rollback: deploying {previous_image_tag} on {instance_id}")
+            deploy_result = ec2_client.deploy_container(
+                instance_id=instance_id,
+                image_tag=previous_image_tag,
+                port=port,
+                container_name="app",
+                health_check_path=health_check_path,
+            )
+
+            return {
+                "success": True,
+                "previous_image_tag": previous_image_tag,
+                "deploy_result": deploy_result,
+            }
+
+        except Exception as e:
+            logger.error(f"Rollback failed: {e}", exc_info=True)
+            return {"success": False, "error": str(e)}
 
     async def get_deployment_status(self, deployment_id: str) -> Dict:
         """
@@ -181,7 +238,8 @@ class OrchestrationService:
     def _mock_deployment(
         self,
         repository: str,
-        instance_id: str
+        instance_id: str,
+        deployment_id: Optional[str] = None,
     ) -> Dict:
         """
         Mock deployment when core workflow not available.
@@ -197,7 +255,7 @@ class OrchestrationService:
 
         return {
             "success": True,
-            "deployment_id": "mock-deploy-123",
+            "deployment_id": deployment_id or "mock-deploy-123",
             "repository": repository,
             "commit_sha": "abc123def456",
 

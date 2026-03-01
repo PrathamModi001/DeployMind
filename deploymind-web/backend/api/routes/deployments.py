@@ -15,6 +15,7 @@ from ..middleware.auth import get_current_active_user
 from ..services.database import get_db
 from ..repositories.deployment_repo import DeploymentRepository
 from ..services.deployment_service import DeploymentService
+from ..services.orchestration_service import OrchestrationService
 
 router = APIRouter(prefix="/api/deployments", tags=["Deployments"])
 
@@ -37,12 +38,13 @@ async def list_deployments(
     # Calculate offset from page number
     offset = (page - 1) * page_size
 
-    # Get deployments from database
+    # Get deployments from database, scoped to current user
     status_filter = status.value if status else None
     deployments, total = repo.list_deployments(
         offset=offset,
         limit=page_size,
         status=status_filter,
+        user_id=current_user.get("user_id"),
     )
 
     # Convert to response format
@@ -115,6 +117,23 @@ async def create_deployment(
         triggered_by=current_user.get("username", "unknown"),
     )
 
+    # Persist env_vars if provided
+    if deployment.env_vars:
+        try:
+            from ..models.environment_variable import EnvironmentVariable
+            for ev in deployment.env_vars:
+                env_var = EnvironmentVariable(
+                    deployment_id=deployment_id,
+                    key=ev.key,
+                    value=ev.value,
+                    is_secret=ev.is_secret,
+                )
+                db.add(env_var)
+            db.commit()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to persist env_vars: {e}")
+
     # Trigger full deployment workflow in background
     background_tasks.add_task(
         service.run_deployment_workflow,
@@ -174,13 +193,14 @@ async def get_deployment_logs(
 @router.post("/{deployment_id}/rollback", response_model=DeploymentResponse)
 async def rollback_deployment(
     deployment_id: str,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
     """
     Rollback a deployment to previous version.
 
-    Reverts to the last successful deployment.
+    Reverts to the last successful deployment for the same repository + instance.
     """
     repo = DeploymentRepository(db)
     deployment = repo.get_by_id(deployment_id)
@@ -191,10 +211,48 @@ async def rollback_deployment(
             detail=f"Deployment {deployment_id} not found"
         )
 
-    # Update status to rolled_back
-    updated_deployment = repo.update_status(deployment_id, "rolled_back")
+    # Find the most recent DEPLOYED deployment for the same repo+instance, excluding current
+    from ..services.database import Deployment as DeploymentModel
+    previous = (
+        db.query(DeploymentModel)
+        .filter(
+            DeploymentModel.repository == deployment.repository,
+            DeploymentModel.instance_id == deployment.instance_id,
+            DeploymentModel.id != deployment_id,
+            DeploymentModel.image_tag.isnot(None),
+        )
+        .order_by(DeploymentModel.created_at.desc())
+        .first()
+    ) if DeploymentModel else None
 
-    # TODO: Trigger actual rollback workflow in background
+    if not previous or not previous.image_tag:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No previous deployment with a known image tag found for rollback"
+        )
+
+    current_image_tag = deployment.image_tag or ""
+    previous_image_tag = previous.image_tag
+
+    # Extract port from extra_data
+    extra_data = deployment.extra_data or {}
+    port = extra_data.get("port", 8080)
+
+    # Immediately set status to rolling_back
+    updated_deployment = repo.update_status(deployment_id, "rolling_back")
+
+    async def _do_rollback():
+        orchestration = OrchestrationService()
+        result = await orchestration.rollback_deployment(
+            instance_id=deployment.instance_id,
+            current_image_tag=current_image_tag,
+            previous_image_tag=previous_image_tag,
+            port=port,
+        )
+        final_status = "rolled_back" if result.get("success") else "failed"
+        repo.update_status(deployment_id, final_status)
+
+    background_tasks.add_task(_do_rollback)
 
     return _deployment_to_response(updated_deployment)
 

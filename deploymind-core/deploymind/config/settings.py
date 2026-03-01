@@ -49,6 +49,11 @@ class Settings:
     max_deployment_time_seconds: int = 300
     health_check_interval_seconds: int = 10
 
+    # Kubernetes
+    kubeconfig_path: str = ""
+    kubernetes_namespace: str = "default"
+    kubernetes_cluster_name: str = ""
+
     @classmethod
     def load(cls, env_file: str | None = None) -> "Settings":
         """Load configuration from environment variables and optional .env file.
@@ -86,6 +91,9 @@ class Settings:
             health_check_interval_seconds=int(
                 os.getenv("HEALTH_CHECK_INTERVAL_SECONDS", "10")
             ),
+            kubeconfig_path=os.getenv("KUBECONFIG_PATH", ""),
+            kubernetes_namespace=os.getenv("KUBERNETES_NAMESPACE", "default"),
+            kubernetes_cluster_name=os.getenv("KUBERNETES_CLUSTER_NAME", ""),
         )
 
     def validate(self) -> list[str]:

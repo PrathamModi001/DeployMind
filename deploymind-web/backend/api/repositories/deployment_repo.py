@@ -40,6 +40,7 @@ class DeploymentRepository:
         offset: int = 0,
         limit: int = 10,
         status: Optional[str] = None,
+        user_id: Optional[int] = None,
     ) -> Tuple[List[Deployment], int]:
         """
         List deployments with pagination and optional filtering.
@@ -48,6 +49,7 @@ class DeploymentRepository:
             offset: Number of records to skip
             limit: Maximum number of records to return
             status: Optional status filter (e.g., "deployed", "pending")
+            user_id: Optional user ID to scope results to current user
 
         Returns:
             Tuple of (deployments list, total count)
@@ -56,6 +58,10 @@ class DeploymentRepository:
             return [], 0
 
         query = self.db.query(Deployment)
+
+        # Scope to user if provided
+        if user_id is not None:
+            query = query.filter(Deployment.user_id == user_id)
 
         # Filter by status if provided
         if status:
@@ -150,9 +156,51 @@ class DeploymentRepository:
         if not deployment:
             return None
 
-        # Convert status string to enum
-        status_lower = status.lower()
-        deployment.status = status_lower
+        # Map status string to DeploymentStatusEnum member
+        if DeploymentStatusEnum is not None:
+            status_upper = status.upper()
+            try:
+                deployment.status = DeploymentStatusEnum[status_upper]
+            except KeyError:
+                # Fall back to raw string if enum member not found
+                deployment.status = status.lower()
+        else:
+            deployment.status = status.lower()
+
+        self.db.commit()
+        self.db.refresh(deployment)
+
+        return deployment
+
+    def update_info(
+        self,
+        deployment_id: str,
+        commit_sha: Optional[str] = None,
+        image_tag: Optional[str] = None,
+        image_size_mb: Optional[float] = None,
+    ) -> Optional[Deployment]:
+        """
+        Update deployment info fields after workflow completes.
+
+        Args:
+            deployment_id: Deployment ID
+            commit_sha: Git commit SHA
+            image_tag: Docker image tag
+            image_size_mb: Docker image size in MB
+
+        Returns:
+            Updated Deployment or None if not found
+        """
+        deployment = self.get_by_id(deployment_id)
+        if not deployment:
+            return None
+
+        if commit_sha is not None:
+            deployment.commit_sha = commit_sha
+        if image_tag is not None:
+            deployment.image_tag = image_tag
+        if image_size_mb is not None:
+            deployment.image_size_mb = image_size_mb
 
         self.db.commit()
         self.db.refresh(deployment)

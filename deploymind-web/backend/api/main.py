@@ -44,6 +44,16 @@ app.add_middleware(
 print("CORS: Allowing localhost ports: 3000, 3001, 3002, 5000")
 
 
+@app.on_event("startup")
+async def startup():
+    """Initialize database tables on startup."""
+    try:
+        from .services.database import init_web_db
+        init_web_db()
+    except Exception as e:
+        logger.warning(f"startup: init_web_db failed (non-fatal): {e}")
+
+
 # Add request logging middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):

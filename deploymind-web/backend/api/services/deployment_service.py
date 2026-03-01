@@ -10,7 +10,7 @@ from pathlib import Path
 import logging
 
 # Import deploymind-core models
-core_path = Path(__file__).parent.parent.parent.parent / "deploymind-core"
+core_path = Path(__file__).parent.parent.parent.parent.parent / "deploymind-core"
 sys.path.insert(0, str(core_path))
 
 try:
@@ -26,6 +26,8 @@ except ImportError:
 
 # Import orchestration service
 from api.services.orchestration_service import OrchestrationService
+from api.websocket.manager import manager as ws_manager
+from api.repositories.deployment_repo import DeploymentRepository
 
 logger = logging.getLogger(__name__)
 
@@ -161,9 +163,14 @@ class DeploymentService:
         if not deployment:
             return None
 
-        # Update status
-        status_lower = status.lower()
-        deployment.status = status_lower
+        # Map string to DeploymentStatusEnum to avoid type mismatch
+        if DeploymentStatusEnum is not None:
+            try:
+                deployment.status = DeploymentStatusEnum[status.upper()]
+            except KeyError:
+                deployment.status = status.lower()
+        else:
+            deployment.status = status.lower()
 
         self.db.commit()
         self.db.refresh(deployment)
@@ -178,6 +185,19 @@ class DeploymentService:
             )
 
         return deployment
+
+    async def _broadcast_status(self, deployment_id: str, status: str, message: str) -> None:
+        """Broadcast status update over WebSocket."""
+        from datetime import datetime
+        try:
+            await ws_manager.broadcast(deployment_id, {
+                "type": "status_update",
+                "status": status,
+                "message": message,
+                "timestamp": datetime.utcnow().isoformat(),
+            })
+        except Exception as e:
+            logger.warning(f"WebSocket broadcast failed: {e}")
 
     async def run_deployment_workflow(
         self,
@@ -213,15 +233,17 @@ class DeploymentService:
         """
         logger.info(f"Starting deployment workflow for {deployment_id}")
 
-        # Update status to pending
+        # Update status to pending and broadcast
         self.update_deployment_status(
             deployment_id=deployment_id,
             status="pending",
             message="Initializing deployment...",
         )
+        await self._broadcast_status(deployment_id, "pending", "Initializing deployment...")
 
         try:
             # Execute full deployment workflow via orchestration service
+            # Pass deployment_id so core uses the same ID (no dual records)
             orchestration = OrchestrationService()
             result = await orchestration.execute_full_deployment(
                 repository=repository,
@@ -230,6 +252,7 @@ class DeploymentService:
                 strategy=strategy,
                 health_check_path=health_check_path,
                 environment=environment,
+                deployment_id=deployment_id,
             )
 
             # Update status based on result
@@ -239,12 +262,29 @@ class DeploymentService:
                     status="deployed",
                     message=f"Deployment successful! App running at {result.get('application_url', 'unknown')}",
                 )
+                await self._broadcast_status(
+                    deployment_id, "deployed",
+                    f"Deployment successful! App at {result.get('application_url', 'unknown')}"
+                )
 
-                # Add detailed logs
+                # Update commit_sha and image_tag on the web record
+                try:
+                    repo = DeploymentRepository(self.db)
+                    repo.update_info(
+                        deployment_id=deployment_id,
+                        commit_sha=result.get("commit_sha"),
+                        image_tag=result.get("image_tag"),
+                        image_size_mb=result.get("image_size_mb"),
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to update deployment info: {e}")
+
+                # Add detailed logs with real data
+                vuln_count = result.get("vulnerabilities_found", 0)
                 self.add_log(
                     deployment_id=deployment_id,
                     level="INFO",
-                    message=f"Security scan: PASSED (0 vulnerabilities)",
+                    message=f"Security scan: PASSED ({vuln_count} vulnerabilities found)",
                     agent="security",
                 )
                 self.add_log(
@@ -256,7 +296,7 @@ class DeploymentService:
                 self.add_log(
                     deployment_id=deployment_id,
                     level="INFO",
-                    message=f"Health check: PASSED",
+                    message="Health check: PASSED",
                     agent="deploy",
                 )
 
@@ -270,6 +310,10 @@ class DeploymentService:
                     deployment_id=deployment_id,
                     status="failed",
                     message=f"Deployment failed at {error_phase}: {error_message}",
+                )
+                await self._broadcast_status(
+                    deployment_id, "failed",
+                    f"Deployment failed at {error_phase}: {error_message}"
                 )
 
                 # Add error log
@@ -299,6 +343,7 @@ class DeploymentService:
                 status="failed",
                 message=f"Deployment error: {str(e)}",
             )
+            await self._broadcast_status(deployment_id, "failed", f"Deployment error: {str(e)}")
 
             self.add_log(
                 deployment_id=deployment_id,
