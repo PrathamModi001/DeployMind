@@ -5,7 +5,7 @@ from crewai import Crew, Task
 from deploymind.agents.security_agent import create_security_agent
 from deploymind.agents.build_agent import create_build_agent
 from deploymind.agents.deploy_agent import create_deploy_agent
-from core.logger import get_logger
+from deploymind.shared.secure_logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -14,7 +14,7 @@ def create_deployment_crew(
     repo_full_name: str,
     instance_id: str,
     strategy: str = "rolling",
-    llm: str = "llama-3.1-70b-versatile",
+    llm: str = "groq/llama-3.1-70b-versatile",
 ) -> Crew:
     """Create a deployment crew that orchestrates the full pipeline.
 
@@ -61,12 +61,31 @@ def create_deployment_crew(
         agent=build_agent,
     )
 
+    _strategy_instructions = {
+        "rolling": (
+            "Use zero-downtime rolling deployment: start the new container, "
+            "perform health checks for 2 minutes, then stop the old container. "
+            "Automatically rollback if health checks fail below 70% success rate."
+        ),
+        "canary": (
+            "Use gradual canary traffic shifting: "
+            "10% canary traffic for 5 minutes → "
+            "50% canary traffic for 5 minutes → "
+            "100% full rollout. "
+            "Monitor canary error rate at each stage. "
+            "Automatically rollback nginx config if error rate exceeds 5%."
+        ),
+    }
+    strategy_instruction = _strategy_instructions.get(
+        strategy.lower(),
+        f"Use {strategy} deployment strategy with health checks and rollback.",
+    )
+
     deploy_task = Task(
         description=(
             f"Deploy the built Docker image to EC2 instance '{instance_id}' "
-            f"using a {strategy} deployment strategy. "
-            "Monitor health checks for 2 minutes after deployment. "
-            "Automatically rollback if health checks fail."
+            f"using the '{strategy}' deployment strategy. "
+            f"{strategy_instruction}"
         ),
         expected_output=(
             "Deployment status (SUCCESS/FAILED/ROLLED_BACK), the deployed "
