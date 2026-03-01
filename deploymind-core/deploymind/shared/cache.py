@@ -59,7 +59,7 @@ def cached(
             # Try Redis first if enabled
             if use_redis:
                 try:
-                    from config.dependencies import container
+                    from deploymind.config.dependencies import container
                     redis_client = container.redis_client
 
                     # Try to get from Redis
@@ -83,7 +83,7 @@ def cached(
             # Store in cache
             try:
                 if use_redis:
-                    from config.dependencies import container
+                    from deploymind.config.dependencies import container
                     redis_client = container.redis_client
                     redis_client.setex(key, ttl_seconds, json.dumps(result))
                 else:

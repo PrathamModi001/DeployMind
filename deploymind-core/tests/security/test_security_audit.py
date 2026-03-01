@@ -472,7 +472,7 @@ class TestSecureDefaults:
     def test_rate_limiting_configured(self):
         """Test rate limiting is configured."""
         # Circuit breaker provides basic rate limiting
-        from shared.retry import CircuitBreaker
+        from deploymind.shared.retry import CircuitBreaker
 
         circuit_breaker = CircuitBreaker()
         assert circuit_breaker.failure_threshold > 0

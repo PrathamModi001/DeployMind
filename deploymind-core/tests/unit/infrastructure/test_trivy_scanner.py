@@ -65,7 +65,7 @@ class TestTrivyScanner:
         # Verify cache dir is set to project directory (E: drive)
         assert "E:" in str(scanner.cache_dir) or scanner.cache_dir.exists()
 
-    @patch('infrastructure.security.trivy_scanner.Path.exists')
+    @patch('deploymind.infrastructure.security.trivy_scanner.Path.exists')
     @patch('subprocess.run')
     def test_trivy_auto_download_if_not_found(self, mock_run, mock_exists):
         """Test that Trivy is auto-downloaded if not found in PATH or local bin."""
@@ -76,7 +76,7 @@ class TestTrivyScanner:
         # Mock download process
         with patch('urllib.request.urlretrieve'), \
              patch('zipfile.ZipFile'), \
-             patch('infrastructure.security.trivy_scanner.Path.mkdir'):
+             patch('deploymind.infrastructure.security.trivy_scanner.Path.mkdir'):
             try:
                 scanner = TrivyScanner()
                 # Should attempt to download

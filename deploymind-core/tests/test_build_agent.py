@@ -23,7 +23,7 @@ class TestBuildAgent:
 
     def test_detect_language_not_implemented(self):
         """detect_language tool should raise NotImplementedError for old version."""
-        from agents.build_agent import detect_language
+        from deploymind.agents.build_agent import detect_language
 
         # This test is for the old implementation - skip if Day 3 is complete
         try:
@@ -36,7 +36,7 @@ class TestBuildAgent:
 
     def test_generate_dockerfile_not_implemented(self):
         """generate_dockerfile tool should raise NotImplementedError for old version."""
-        from agents.build_agent import generate_dockerfile
+        from deploymind.agents.build_agent import generate_dockerfile
 
         # This test is for the old implementation - skip if Day 3 is complete
         try:
@@ -49,7 +49,7 @@ class TestBuildAgent:
 
     def test_build_docker_image_not_implemented(self):
         """build_docker_image tool should raise NotImplementedError for old version."""
-        from agents.build_agent import build_docker_image
+        from deploymind.agents.build_agent import build_docker_image
 
         # This test is for the old implementation - skip if Day 3 is complete
         try:

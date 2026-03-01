@@ -83,7 +83,7 @@ def deploy_use_case(mock_settings):
 class TestHealthChecker:
     """Test HealthChecker functionality."""
 
-    @patch('infrastructure.monitoring.health_checker.requests.get')
+    @patch('deploymind.infrastructure.monitoring.health_checker.requests.get')
     def test_http_check_success(self, mock_get, health_checker):
         """Test successful HTTP health check."""
         # Mock successful HTTP response
@@ -99,7 +99,7 @@ class TestHealthChecker:
         assert result.status_code == 200
         assert result.response_time_ms is not None
 
-    @patch('infrastructure.monitoring.health_checker.requests.get')
+    @patch('deploymind.infrastructure.monitoring.health_checker.requests.get')
     def test_http_check_failure(self, mock_get, health_checker):
         """Test HTTP health check failure."""
         # Mock failed HTTP response
@@ -114,7 +114,7 @@ class TestHealthChecker:
         assert result.status_code == 500
         assert result.error_message is not None
 
-    @patch('infrastructure.monitoring.health_checker.requests.get')
+    @patch('deploymind.infrastructure.monitoring.health_checker.requests.get')
     def test_http_check_timeout(self, mock_get, health_checker):
         """Test HTTP health check timeout."""
         import requests
@@ -126,7 +126,7 @@ class TestHealthChecker:
         assert result.error_message is not None
         assert "timeout" in result.error_message.lower()
 
-    @patch('infrastructure.monitoring.health_checker.socket.socket')
+    @patch('deploymind.infrastructure.monitoring.health_checker.socket.socket')
     def test_tcp_check_success(self, mock_socket, health_checker):
         """Test successful TCP port check."""
         # Mock successful TCP connection
@@ -140,7 +140,7 @@ class TestHealthChecker:
         assert result.check_type == "tcp"
         assert result.response_time_ms is not None
 
-    @patch('infrastructure.monitoring.health_checker.socket.socket')
+    @patch('deploymind.infrastructure.monitoring.health_checker.socket.socket')
     def test_tcp_check_failure(self, mock_socket, health_checker):
         """Test TCP port check failure."""
         # Mock failed TCP connection

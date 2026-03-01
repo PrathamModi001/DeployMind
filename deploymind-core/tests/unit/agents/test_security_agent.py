@@ -9,7 +9,7 @@ from deploymind.infrastructure.security.trivy_scanner import TrivyScanResult, Vu
 @pytest.fixture
 def security_agent():
     """Create SecurityAgentService instance."""
-    with patch('agents.security.security_agent.GroqClient'):
+    with patch('deploymind.agents.security.security_agent.GroqClient'):
         agent = SecurityAgentService()
         return agent
 
@@ -249,8 +249,8 @@ class TestSecurityAgentAnalyzeScan:
         assert decision.risk_score == 0
         assert "No vulnerabilities" in decision.reasoning
 
-    @patch('agents.security.security_agent.CREWAI_AVAILABLE', True)
-    @patch('agents.security.security_agent.Crew')
+    @patch('deploymind.agents.security.security_agent.CREWAI_AVAILABLE', True)
+    @patch('deploymind.agents.security.security_agent.Crew')
     def test_analyze_scan_ai_success(self, mock_crew, security_agent, high_scan):
         """Test successful AI analysis (requires CrewAI)."""
         # Skip if CrewAI not available
@@ -281,7 +281,7 @@ class TestSecurityAgentAnalyzeScan:
         assert 50 <= decision.risk_score <= 100  # Accept range
         assert len(decision.recommendations) > 0
 
-    @patch('agents.security.security_agent.Crew')
+    @patch('deploymind.agents.security.security_agent.Crew')
     def test_analyze_scan_ai_failure_fallback(self, mock_crew, security_agent, critical_scan):
         """Test that AI failure falls back to rule-based."""
         # Mock AI failure
@@ -295,14 +295,14 @@ class TestSecurityAgentAnalyzeScan:
         assert decision.decision == "reject"
         assert decision.risk_score == 100
 
-    @patch('agents.security.security_agent.Crew')
+    @patch('deploymind.agents.security.security_agent.Crew')
     def test_analyze_scan_logs_result(self, mock_crew, security_agent, high_scan):
         """Test that analysis is logged."""
         mock_crew_instance = Mock()
         mock_crew_instance.kickoff.return_value = "{}"
         mock_crew.return_value = mock_crew_instance
 
-        with patch('agents.security.security_agent.logger') as mock_logger:
+        with patch('deploymind.agents.security.security_agent.logger') as mock_logger:
             security_agent.analyze_scan(high_scan)
 
             # Verify logging
@@ -342,7 +342,7 @@ class TestSecurityAgentIntegration:
 
     def test_full_workflow_with_trivy(self):
         """Test complete workflow: scan + analysis (requires Trivy)."""
-        from infrastructure.security.trivy_scanner import TrivyScanner
+        from deploymind.infrastructure.security.trivy_scanner import TrivyScanner
 
         try:
             # Scan a real image
@@ -350,7 +350,7 @@ class TestSecurityAgentIntegration:
             scan_result = scanner.scan_image("alpine:3.19", severity="CRITICAL")
 
             # Analyze with Security Agent
-            with patch('agents.security.security_agent.GroqClient'):
+            with patch('deploymind.agents.security.security_agent.GroqClient'):
                 agent = SecurityAgentService()
                 decision = agent.analyze_scan(scan_result, policy="strict")
 

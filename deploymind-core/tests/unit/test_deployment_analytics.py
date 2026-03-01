@@ -16,7 +16,7 @@ from deploymind.application.analytics.deployment_analytics import (
 @pytest.fixture
 def mock_repos():
     """Create mock repositories."""
-    with patch('application.analytics.deployment_analytics.container') as mock_container:
+    with patch('deploymind.application.analytics.deployment_analytics.container') as mock_container:
         mock_container.deployment_repo = Mock()
         mock_container.security_scan_repo = Mock()
         mock_container.build_result_repo = Mock()

@@ -152,7 +152,7 @@ class TestCachedDecorator:
 
         assert my_function.__name__ == "my_function"
 
-    @patch('config.dependencies.container')
+    @patch('deploymind.config.dependencies.container')
     def test_cache_with_redis(self, mock_container):
         """Test caching with Redis."""
         mock_redis = Mock()
@@ -175,7 +175,7 @@ class TestCachedDecorator:
         # Should have tried to get from Redis
         assert mock_redis.get.called
 
-    @patch('config.dependencies.container')
+    @patch('deploymind.config.dependencies.container')
     def test_cache_redis_fallback(self, mock_container):
         """Test fallback to in-memory when Redis fails."""
         mock_redis = Mock()

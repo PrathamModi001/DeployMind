@@ -23,7 +23,7 @@ class TestDeployAgent:
 
     def test_deploy_container_implemented(self):
         """deploy_container tool should be implemented (Day 4 complete)."""
-        from agents.deploy_agent import deploy_container
+        from deploymind.agents.deploy_agent import deploy_container
 
         # Day 4 is complete, so this should not raise NotImplementedError
         # Just verify the tool exists
@@ -32,7 +32,7 @@ class TestDeployAgent:
 
     def test_health_check_implemented(self):
         """health_check tool should be implemented (Day 4 complete)."""
-        from agents.deploy_agent import health_check
+        from deploymind.agents.deploy_agent import health_check
 
         # Day 4 is complete, so this should not raise NotImplementedError
         # Just verify the tool exists
@@ -41,7 +41,7 @@ class TestDeployAgent:
 
     def test_rollback_implemented(self):
         """rollback_deployment tool should be implemented (Day 4 complete)."""
-        from agents.deploy_agent import rollback_deployment
+        from deploymind.agents.deploy_agent import rollback_deployment
 
         # Day 4 is complete, so this should not raise NotImplementedError
         # Just verify the tool exists
